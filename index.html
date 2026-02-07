@@ -3,430 +3,290 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gerador Minecraft Avançado</title>
-
+<title>Gerador Minecraft Resource Pack</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
 <style>
+:root {
+  --bg-color: #f8f8f8;
+  --text-color: #222;
+  --card-bg: #e0e0e0;
+  --item-bg: #f0f0f0;
+  --folder-bg: #d9d9ff;
+}
 body {
   font-family: Arial, sans-serif;
-  background: white;
-  color: black;
-  max-width: 900px;
+  background: var(--bg-color);
+  color: var(--text-color);
+  max-width: 1200px;
   margin: auto;
   padding: 20px;
+  font-size:16px;
 }
-
-h1 { font-size: 24px; margin-bottom: 20px; text-align: center; }
-
-.card {
-  background: #e0e0e0;
-  padding: 16px;
-  border-radius: 8px;
-  margin-bottom: 16px;
-  box-sizing: border-box;
-}
-
-button, input, select, textarea {
-  font-size: 14px;
-}
-
-button {
-  cursor: pointer;
-  font-weight: bold;
-  border: none;
-  background: #d0d0d0;
-  border-radius: 6px;
-  transition: background 0.2s;
-}
-
-button:hover { background: #c0c0c0; }
-
-.item, .folder {
-  background: #f0f0f0;
-  padding: 12px;
-  margin: 4px;
-  border-radius: 6px;
-  box-sizing: border-box;
-}
-
-.folder {
-  background: #d9d9ff;
-}
-
-.small { font-size: 12px; opacity: 0.7; display: block; margin-top: 4px; }
-
+h1 { text-align:center; font-size:28px; margin-bottom:20px; }
+.card { background:var(--card-bg); padding:16px; border-radius:10px; margin-bottom:20px; }
+button,input,select,textarea { font-size:16px; }
+button { cursor:pointer; font-weight:bold; border:none; background:#d0d0d0; border-radius:8px; transition:0.2s; padding:8px 12px; }
+button:hover { background:#c0c0c0; }
+.item, .folder { background:var(--item-bg); padding:12px; margin:8px 0; border-radius:8px; box-sizing:border-box; position:relative; }
+.folder { background:var(--folder-bg); }
+.item-header { cursor:pointer; font-weight:bold; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
+.item-content, .folder-items { display:none; margin-top:8px; }
+.small { font-size:13px; opacity:0.7; margin-top:4px; display:block; }
 input[type="checkbox"] { width:auto; margin-right:6px; vertical-align:middle; }
 input[type="file"] { padding:4px; }
-textarea { resize: vertical; }
-select { padding:6px; }
-#itemsContainer { display:flex; flex-wrap:wrap; gap:10px; }
-.item, .folder { width: calc(33% - 10px); }
-
+textarea { resize:vertical; }
+select,input,textarea { width:100%; margin:6px 0; padding:6px 10px; border-radius:6px; border:1px solid #aaa; box-sizing:border-box; }
+#itemsContainer { display:flex; flex-wrap:wrap; gap:12px; }
+.item, .folder { width:calc(33% - 12px); }
+#overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); display:none; z-index:998; }
+#popup { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#fff; border:2px solid #333; padding:20px; z-index:999; border-radius:8px; max-height:80%; overflow:auto; display:none; width:450px; }
+#popup h2 { margin-top:0; text-align:center; }
+.menu-config { position:fixed; top:20px; left:0; background:#ddd; padding:16px; border-radius:0 8px 8px 0; box-shadow:2px 2px 10px rgba(0,0,0,0.3);}
 </style>
 </head>
-
 <body>
+<h1>Gerador Minecraft Resource Pack</h1>
 
-<h1>Gerador Minecraft Avançado</h1>
-
-<input type="hidden" id="mode" value="resource">
-
-<div style="display:flex; gap:10px; margin-bottom:12px;">
-  <button type="button" onclick="setPage('resource')">Resource Pack</button>
-  <button type="button" onclick="setPage('datapack')">Datapack</button>
-</div>
-
-<div class="card" id="pageTitle"></div>
+<div class="card" id="pageTitle"><b>Modo Resource Pack</b><br><span class="small">Substitua terracotas e blocos</span></div>
 
 <div class="card">
   <label>Nome do projeto</label>
   <input id="projectName">
-
   <label>Descrição</label>
   <textarea id="projectDesc"></textarea>
-
   <label>Projetos salvos</label>
   <select id="savedProjects" onchange="loadProject()">
     <option value="">— selecionar —</option>
   </select>
-
-  <button type="button" onclick="newProject()">Novo projeto</button>
+  <button onclick="newProject()">Novo projeto</button>
 </div>
 
 <div class="card">
-  <h3>Itens / Blocos / Pastas</h3>
+  <h3>Blocos / Pastas</h3>
   <div id="itemsContainer"></div>
-  <button type="button" onclick="addFolder()">Adicionar Pasta</button>
-  <button type="button" onclick="addItem()">Adicionar Item</button>
+  <button onclick="addFolder()">Adicionar Pasta</button>
+  <div style="margin-top:8px;">
+    <label>Escolha o bloco para criar:</label>
+    <select id="blockSelector"></select>
+    <button onclick="addItem()">Adicionar Bloco</button>
+  </div>
 </div>
 
-<button type="button" onclick="exportPack()">Exportar</button>
+<button onclick="exportPack()">Exportar</button>
+
+<!-- Menu Configurações -->
+<div class="menu-config">
+  <label>Tamanho da fonte: <input type="number" id="fontSize" value="16" onchange="updateFontSize()">px</label>
+  <br>
+  <label>Modo: 
+    <select id="themeMode" onchange="updateTheme()">
+      <option value="light">Claro</option>
+      <option value="dark">Escuro</option>
+    </select>
+  </label>
+</div>
+
+<div id="overlay"></div>
+<div id="popup" class="popup"></div>
 
 <script>
-let terracotaAndTiles = [
-  "white_terracotta","orange_terracotta","magenta_terracotta",
-  "light_blue_terracotta","yellow_terracotta","lime_terracotta",
-  "pink_terracotta","gray_terracotta","light_gray_terracotta",
-  "cyan_terracotta","purple_terracotta","blue_terracotta",
-  "brown_terracotta","green_terracotta","red_terracotta",
-  "black_terracotta",
-  "terracotta","minecraft:bricks","minecraft:stone_bricks",
-  "minecraft:deepslate_tiles","minecraft:quartz_bricks"
+let allTerracotas=[
+  "white_terracotta","orange_terracotta","magenta_terracotta","light_blue_terracotta",
+  "yellow_terracotta","lime_terracotta","pink_terracotta","gray_terracotta",
+  "light_gray_terracotta","cyan_terracotta","purple_terracotta","blue_terracotta",
+  "brown_terracotta","green_terracotta","red_terracotta","black_terracotta",
+  "terracotta","bricks","stone_bricks"
 ];
 
-let toolsAndItems = [
-  "wooden_sword","stone_sword","iron_sword","golden_sword","diamond_sword","netherite_sword",
-  "wooden_pickaxe","stone_pickaxe","iron_pickaxe","golden_pickaxe","diamond_pickaxe","netherite_pickaxe",
-  "wooden_axe","stone_axe","iron_axe","golden_axe","diamond_axe","netherite_axe",
-  "wooden_shovel","stone_shovel","iron_shovel","golden_shovel","diamond_shovel","netherite_shovel",
-  "wooden_hoe","stone_hoe","iron_hoe","golden_hoe","diamond_hoe","netherite_hoe",
-  "stick","apple","bread","diamond","iron_ingot"
-];
+let availableBlocks=[...allTerracotas]; // blocos disponíveis
+let currentId=null;
+let uploadedImages={}; // armazenar imagens carregadas por item
 
-let currentId = null;
-
-function setPage(page){
-  document.getElementById('mode').value = page;
-  document.getElementById('itemsContainer').innerHTML = '';
-  document.getElementById('pageTitle').innerHTML = page==='resource'
-    ? '<b>Modo Resource Pack</b><br><span class="small">Substitui terracotas, azulejos e blocos</span>'
-    : '<b>Modo Datapack</b><br><span class="small">Itens, ferramentas, blocos e propriedades customizadas</span>';
-  saveProject();
+function refreshBlockSelector(){
+  const selector=document.getElementById('blockSelector');
+  selector.innerHTML='';
+  availableBlocks.forEach(b=>{
+    const opt=document.createElement('option');
+    opt.value=b; opt.textContent=b;
+    selector.appendChild(opt);
+  });
 }
 
 function addFolder(){
-  const folderDiv = document.createElement('div');
-  folderDiv.className='folder';
-  folderDiv.innerHTML=`
-    <label>Nome da Pasta</label>
-    <input class="folderName" value="Nova Pasta">
-    <button type="button" onclick="addItem(this.parentNode)">Adicionar Item nesta Pasta</button>
-    <div class="folderItems"></div>
-  `;
-  document.getElementById('itemsContainer').appendChild(folderDiv);
+  const folder=document.createElement('div'); folder.className='folder';
+  folder.innerHTML=`<div class="item-header">Pasta: <span class="folderName">Nova Pasta</span> 
+    <button onclick="addItem(this.parentNode)">Adicionar Bloco</button>
+    <button onclick="removeFolder(this)">Excluir Pasta</button>
+    </div><div class="folder-items"></div>`;
+  document.getElementById('itemsContainer').appendChild(folder);
 }
+
+function removeFolder(btn){ btn.closest('.folder').remove(); }
 
 function addItem(parent=null){
-  const mode = document.getElementById('mode').value;
-  const container = parent ? parent.querySelector('.folderItems') : document.getElementById('itemsContainer');
+  const selector=document.getElementById('blockSelector');
+  if(selector.options.length===0){ alert("Nenhum bloco disponível!"); return; }
+  const selectedBlock=selector.value;
 
-  const div=document.createElement('div');
-  div.className='item';
-
-  let optionsSelect='';
-  if(mode==='resource') {
-    optionsSelect=terracotaAndTiles.map(b=>`<option>${b}</option>`).join('');
-  } else {
-    optionsSelect=toolsAndItems.map(b=>`<option>${b}</option>`).join('');
-  }
-
+  const container=parent?parent.querySelector('.folder-items'):document.getElementById('itemsContainer');
+  const div=document.createElement('div'); div.className='item';
   div.innerHTML=`
-    <label>Tipo de Item</label>
-    <select class="itemType">${optionsSelect}</select>
-
-    <label>Nome do Item</label>
-    <input class="itemName" placeholder="Nome no jogo">
-
-    <label>Nome da textura / ID</label>
-    <input class="texName">
-
-    <label>Textura PNG</label>
-    <input type="file" class="image" accept="image/png">
-
-    <label><input type="checkbox" class="rotate"> Permitir rotação</label>
-    <label><input type="checkbox" class="crafting" checked> Habilitar crafting</label>
-
-    <label>Dano / Durabilidade</label>
-    <input type="number" class="damage" value="0">
-
-    <label>Inflamável</label>
-    <input type="checkbox" class="flammable">
-
-    <label>Custom JSON</label>
-    <input type="file" class="modelJSON" accept=".json">
-
-    <button type="button" onclick="removeItem(this)">Remover Item</button>
-  `;
-
-  // Remover item usado das opções globais
-  const select = div.querySelector('.itemType');
-  const val = select.value;
-  if(mode==='resource') removeFromArray(terracotaAndTiles,val);
-  else removeFromArray(toolsAndItems,val);
-  refreshSelects();
-
-  select.addEventListener('change',()=>{
-    const oldVal=div.querySelector('.itemName').value;
-    div.querySelector('.itemName').value=select.value;
-    div.querySelector('.texName').value=select.value;
-    // atualizar arrays
-    if(mode==='resource') removeFromArray(terracotaAndTiles,select.value);
-    else removeFromArray(toolsAndItems,select.value);
-    if(oldVal) addBack(oldVal,mode);
-    refreshSelects();
-  });
-
+    <div class="item-header">Bloco: <span class="itemType">${selectedBlock}</span> 
+      <button onclick="openItemConfig(this)">Configurar</button> 
+      <button onclick="removeItem(this, true)">${parent?'Remover':'Remover'}</button>
+    </div>`;
   container.appendChild(div);
+
+  // remover bloco usado da lista
+  availableBlocks = availableBlocks.filter(b=>b!==selectedBlock);
+  refreshBlockSelector();
 }
 
-function removeItem(btn){
-  const itemDiv=btn.parentNode;
-  const mode=document.getElementById('mode').value;
-  const val=itemDiv.querySelector('.itemType')?.value;
-  if(mode==='resource') addBack(val,'resource');
-  else addBack(val,'datapack');
-  itemDiv.remove();
-}
+function openItemConfig(btn){
+  const itemDiv=btn.closest('.item');
+  const popup=document.getElementById('popup');
+  popup.innerHTML=`
+    <h2>Configuração: ${itemDiv.querySelector('.itemType').textContent}</h2>
+    <label>Nome do bloco</label>
+    <input id="configName" value="${itemDiv.querySelector('.itemType').textContent}" readonly>
+    <label>Selecionar imagem (PNG)</label>
+    <input type="file" id="configImage" accept="image/png">
+    <button onclick="saveItemConfig()">Salvar</button>
+    <button onclick="closePopup()">Fechar</button>
+  `;
+  document.getElementById('overlay').style.display='block';
+  popup.style.display='block';
 
-function removeFromArray(arr,val){
-  const index=arr.indexOf(val);
-  if(index>-1) arr.splice(index,1);
-}
-
-function addBack(val,mode){
-  if(!val) return;
-  if(mode==='resource' && !terracotaAndTiles.includes(val)) terracotaAndTiles.push(val);
-  if(mode==='datapack' && !toolsAndItems.includes(val)) toolsAndItems.push(val);
-}
-
-function refreshSelects(){
-  document.querySelectorAll('.itemType').forEach(sel=>{
-    const val=sel.value;
-    const options=document.getElementById('mode').value==='resource'?terracotaAndTiles:toolsAndItems;
-    sel.innerHTML=options.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('');
+  document.getElementById('configImage').addEventListener('change',(e)=>{
+    const file=e.target.files[0];
+    if(file) uploadedImages[itemDiv.querySelector('.itemType').textContent]=file;
   });
 }
 
-function collectData(){
+function saveItemConfig(){ closePopup(); }
+function closePopup(){ document.getElementById('popup').style.display='none'; document.getElementById('overlay').style.display='none'; }
+
+function removeItem(btn, restore=true){ 
+  const blockName = btn.closest('.item').querySelector('.itemType').textContent;
+  if(restore) { availableBlocks.push(blockName); refreshBlockSelector(); }
+  delete uploadedImages[blockName];
+  btn.closest('.item').remove(); 
+}
+
+function collectData(){ 
   const items=[...document.querySelectorAll('#itemsContainer .item')].map(el=>({
-    name: el.querySelector('.itemName')?.value,
-    tex: el.querySelector('.texName')?.value || el.querySelector('.itemName')?.value,
-    type: el.querySelector('.itemType')?.value,
-    rotate: el.querySelector('.rotate')?.checked,
-    crafting: el.querySelector('.crafting')?.checked,
-    damage: el.querySelector('.damage')?.value,
-    flammable: el.querySelector('.flammable')?.checked,
-    modelJSON: el.querySelector('.modelJSON')?.files[0] || null
+    name:el.querySelector('.itemType')?.textContent
   }));
-
-  const folders=[...document.querySelectorAll('.folder')].map(f=>({
-    name: f.querySelector('.folderName').value,
-    items:[...f.querySelectorAll('.item')].map(el=>({
-      name: el.querySelector('.itemName')?.value,
-      tex: el.querySelector('.texName')?.value || el.querySelector('.itemName')?.value,
-      type: el.querySelector('.itemType')?.value,
-      rotate: el.querySelector('.rotate')?.checked,
-      crafting: el.querySelector('.crafting')?.checked,
-      damage: el.querySelector('.damage')?.value,
-      flammable: el.querySelector('.flammable')?.checked,
-      modelJSON: el.querySelector('.modelJSON')?.files[0] || null
-    }))
-  }));
-
   return {
-    mode: document.getElementById('mode').value,
-    name: document.getElementById('projectName').value,
-    desc: document.getElementById('projectDesc').value,
-    items, folders
+    name:document.getElementById('projectName').value,
+    desc:document.getElementById('projectDesc').value,
+    items
   };
 }
 
-function saveProject(){
-  try{
-    const data=collectData();
-    if(!currentId) currentId=Date.now().toString();
-    localStorage.setItem('project_'+currentId,JSON.stringify(data));
-    refreshProjects();
-  }catch{}
+function saveProject(){ 
+  try{ 
+    const data=collectData(); 
+    if(!currentId) currentId=Date.now().toString(); 
+    localStorage.setItem('project_'+currentId,JSON.stringify(data)); 
+    refreshProjects(); 
+  }catch{} 
 }
 
-function refreshProjects(){
-  const sel=document.getElementById('savedProjects');
-  sel.innerHTML='<option value="">— selecionar —</option>';
+function refreshProjects(){ 
+  const sel=document.getElementById('savedProjects'); 
+  sel.innerHTML='<option value="">— selecionar —</option>'; 
   Object.keys(localStorage).filter(k=>k.startsWith('project_')).forEach(k=>{
-    try{
-      const data=JSON.parse(localStorage.getItem(k));
-      const opt=document.createElement('option');
-      opt.value=k.replace('project_','');
-      opt.textContent=data.name||'(sem nome)';
-      sel.appendChild(opt);
-    }catch{}
-  });
+    try{ 
+      const data=JSON.parse(localStorage.getItem(k)); 
+      const opt=document.createElement('option'); 
+      opt.value=k.replace('project_',''); 
+      opt.textContent=data.name||'(sem nome)'; 
+      sel.appendChild(opt); 
+    }catch{} 
+  }); 
 }
 
-function loadProject(){
+function loadProject(){ 
   const id=document.getElementById('savedProjects').value;
   if(!id) return;
-  currentId=id;
   const data=JSON.parse(localStorage.getItem('project_'+id));
-  document.getElementById('mode').value=data.mode;
+  if(!data) return;
+  currentId=id;
   document.getElementById('projectName').value=data.name;
   document.getElementById('projectDesc').value=data.desc;
   document.getElementById('itemsContainer').innerHTML='';
+  uploadedImages={};
+  availableBlocks=[...allTerracotas];
 
-  data.folders.forEach(f=>{
-    addFolder();
-    const folder=document.querySelectorAll('.folder');
-    const last=folder[folder.length-1];
-    last.querySelector('.folderName').value=f.name;
-    f.items.forEach(i=>{
-      addItem(last);
-      const items=last.querySelectorAll('.item');
-      const lastItem=items[items.length-1];
-      lastItem.querySelector('.itemName').value=i.name;
-      lastItem.querySelector('.texName').value=i.tex;
-      lastItem.querySelector('.itemType').value=i.type;
-      lastItem.querySelector('.rotate').checked=i.rotate;
-      lastItem.querySelector('.crafting').checked=i.crafting;
-      lastItem.querySelector('.damage').value=i.damage;
-      lastItem.querySelector('.flammable').checked=i.flammable;
-    });
+  data.items.forEach(item=>{
+    const div=document.createElement('div'); div.className='item';
+    div.innerHTML=`<div class="item-header">Bloco: <span class="itemType">${item.name}</span>
+      <button onclick="openItemConfig(this)">Configurar</button>
+      <button onclick="removeItem(this,true)">Remover</button>
+    </div>`;
+    document.getElementById('itemsContainer').appendChild(div);
+    availableBlocks = availableBlocks.filter(b=>b!==item.name);
   });
-
-  data.items.forEach(i=>{
-    addItem();
-    const items=document.querySelectorAll('#itemsContainer .item');
-    const lastItem=items[items.length-1];
-    lastItem.querySelector('.itemName').value=i.name;
-    lastItem.querySelector('.texName').value=i.tex;
-    lastItem.querySelector('.itemType').value=i.type;
-    lastItem.querySelector('.rotate').checked=i.rotate;
-    lastItem.querySelector('.crafting').checked=i.crafting;
-    lastItem.querySelector('.damage').value=i.damage;
-    lastItem.querySelector('.flammable').checked=i.flammable;
-  });
+  refreshBlockSelector();
 }
 
-function newProject(){
-  currentId=null;
-  document.getElementById('itemsContainer').innerHTML='';
-  document.getElementById('projectName').value='';
-  document.getElementById('projectDesc').value='';
-  terracotaAndTiles=[
-    "white_terracotta","orange_terracotta","magenta_terracotta",
-    "light_blue_terracotta","yellow_terracotta","lime_terracotta",
-    "pink_terracotta","gray_terracotta","light_gray_terracotta",
-    "cyan_terracotta","purple_terracotta","blue_terracotta",
-    "brown_terracotta","green_terracotta","red_terracotta",
-    "black_terracotta",
-    "terracotta","minecraft:bricks","minecraft:stone_bricks"
-  ];
-  toolsAndItems=[
-    "wooden_sword","stone_sword","iron_sword","golden_sword","diamond_sword","netherite_sword",
-    "wooden_pickaxe","stone_pickaxe","iron_pickaxe","golden_pickaxe","diamond_pickaxe","netherite_pickaxe",
-    "wooden_axe","stone_axe","iron_axe","golden_axe","diamond_axe","netherite_axe",
-    "wooden_shovel","stone_shovel","iron_shovel","golden_shovel","diamond_shovel","netherite_shovel",
-    "wooden_hoe","stone_hoe","iron_hoe","golden_hoe","diamond_hoe","netherite_hoe",
-    "stick","apple","bread","diamond","iron_ingot"
-  ];
+function newProject(){ 
+  currentId=null; 
+  document.getElementById('itemsContainer').innerHTML=''; 
+  document.getElementById('projectName').value=''; 
+  document.getElementById('projectDesc').value=''; 
+  uploadedImages={};
+  availableBlocks=[...allTerracotas];
+  refreshBlockSelector();
 }
 
 async function exportPack(){
   try{
     const data=collectData();
     const zip=new JSZip();
-    if(data.mode==='resource'){
-      const rp=zip.folder(data.name||'resourcepack');
-      rp.file("pack.mcmeta",JSON.stringify({pack:{pack_format:15,description:data.desc||"Resource Pack"}},null,2));
-      const assets=rp.folder("assets/minecraft/textures/block");
+    const rp=zip.folder(data.name||'resourcepack');
+    rp.file("pack.mcmeta",JSON.stringify({pack:{pack_format:15,description:data.desc||"Resource Pack"}},null,2));
 
-      data.items.concat(...data.folders.map(f=>f.items)).forEach(async(item)=>{
-        const fileInput=document.querySelectorAll('.item').item(0).querySelector('.image');
-        const file=fileInput?.files[0];
-        if(file){
-          const arrayBuffer=await file.arrayBuffer();
-          assets.file(item.tex+".png",arrayBuffer);
-        }
-      });
-
-    }else{
-      const dp=zip.folder(data.name||'datapack');
-      dp.file("pack.mcmeta",JSON.stringify({pack:{pack_format:15,description:data.desc||"Datapack"}},null,2));
-      const dataFolder=dp.folder("data/custom_namespace");
-      const recipes=dataFolder.folder("recipes");
-      const blocks=dataFolder.folder("blocks");
-      const functions=dataFolder.folder("functions");
-      let giveAllContent='';
-
-      data.items.concat(...data.folders.map(f=>f.items)).forEach(async(item)=>{
-        const fileInput=document.querySelectorAll('.item').item(0).querySelector('.image');
-        const file=fileInput?.files[0];
-        const modelFile=document.querySelectorAll('.item').item(0).querySelector('.modelJSON')?.files[0];
-        if(file){
-          const arrayBuffer=await file.arrayBuffer();
-          blocks.file(item.tex+".png",arrayBuffer);
-        }
-        if(modelFile){
-          const modelBuffer=await modelFile.arrayBuffer();
-          blocks.file(item.tex+".json",modelBuffer);
-        }
-        if(item.crafting){
-          recipes.file(item.tex+".json",JSON.stringify({
-            type:"minecraft:crafting_shaped",
-            pattern:["###","###","###"],
-            key:{"#":{item:"minecraft:stone"}},
-            result:{item:`custom_namespace:${item.tex}`,count:1}
-          },null,2));
-        }
-        giveAllContent+=`give @p custom_namespace:${item.tex} 1\n`;
-      });
-
-      functions.file("giveall.mcfunction",giveAllContent);
+    const assets=rp.folder("assets").folder("minecraft").folder("textures").folder("block");
+    for(const item of data.items){
+      const file=uploadedImages[item.name];
+      if(file){
+        const content=await file.arrayBuffer();
+        assets.file(item.name+".png",content);
+      }
     }
 
     const content=await zip.generateAsync({type:"blob"});
-    const a=document.createElement("a");
-    a.href=URL.createObjectURL(content);
-    a.download=(data.name||"minecraft_pack")+".zip";
-    a.click();
+    const a=document.createElement("a"); 
+    a.href=URL.createObjectURL(content); 
+    a.download=(data.name||"resourcepack")+".zip"; 
+    a.click(); 
     URL.revokeObjectURL(a.href);
+  }catch(e){ alert("Erro ao exportar:"+e.message); console.error(e);}
+}
 
-  }catch(e){alert("Erro ao exportar:"+e.message);console.error(e);}
+// Menu Config
+function updateFontSize(){ document.body.style.fontSize=document.getElementById('fontSize').value+'px'; }
+function updateTheme(){
+  const theme=document.getElementById('themeMode').value;
+  if(theme==='dark'){
+    document.documentElement.style.setProperty('--bg-color','#222');
+    document.documentElement.style.setProperty('--text-color','#f8f8f8');
+    document.documentElement.style.setProperty('--card-bg','#333');
+    document.documentElement.style.setProperty('--item-bg','#444');
+    document.documentElement.style.setProperty('--folder-bg','#6666ff');
+  } else {
+    document.documentElement.style.setProperty('--bg-color','#f8f8f8');
+    document.documentElement.style.setProperty('--text-color','#222');
+    document.documentElement.style.setProperty('--card-bg','#e0e0e0');
+    document.documentElement.style.setProperty('--item-bg','#f0f0f0');
+    document.documentElement.style.setProperty('--folder-bg','#d9d9ff');
+  }
 }
 
 refreshProjects();
-setPage('resource');
+refreshBlockSelector();
 </script>
 </body>
 </html>
