@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gerador Minecraft</title>
+<title>Gerador Minecraft Avançado</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
@@ -12,7 +12,7 @@ body {
   font-family: Arial, sans-serif;
   background: white;
   color: black;
-  max-width: 600px;
+  max-width: 900px;
   margin: auto;
   padding: 20px;
 }
@@ -28,10 +28,6 @@ h1 { font-size: 24px; margin-bottom: 20px; text-align: center; }
 }
 
 button, input, select, textarea {
-  width: 100%;
-  margin-top: 8px;
-  padding: 8px 10px;
-  box-sizing: border-box;
   font-size: 14px;
 }
 
@@ -44,43 +40,35 @@ button {
   transition: background 0.2s;
 }
 
-button:hover {
-  background: #c0c0c0;
-}
+button:hover { background: #c0c0c0; }
 
-.item {
+.item, .folder {
   background: #f0f0f0;
   padding: 12px;
-  margin-top: 12px;
+  margin: 4px;
   border-radius: 6px;
   box-sizing: border-box;
 }
 
+.folder {
+  background: #d9d9ff;
+}
+
 .small { font-size: 12px; opacity: 0.7; display: block; margin-top: 4px; }
 
-input[type="checkbox"] {
-  width: auto;
-  margin-right: 6px;
-  vertical-align: middle;
-}
+input[type="checkbox"] { width:auto; margin-right:6px; vertical-align:middle; }
+input[type="file"] { padding:4px; }
+textarea { resize: vertical; }
+select { padding:6px; }
+#itemsContainer { display:flex; flex-wrap:wrap; gap:10px; }
+.item, .folder { width: calc(33% - 10px); }
 
-input[type="file"] {
-  padding: 4px;
-}
-
-textarea {
-  resize: vertical;
-}
-
-select {
-  padding: 6px;
-}
 </style>
 </head>
 
 <body>
 
-<h1>Gerador Minecraft</h1>
+<h1>Gerador Minecraft Avançado</h1>
 
 <input type="hidden" id="mode" value="resource">
 
@@ -107,301 +95,338 @@ select {
 </div>
 
 <div class="card">
-  <h3>Itens / Blocos</h3>
-  <div id="items"></div>
-  <button type="button" onclick="addItem()">Adicionar item</button>
+  <h3>Itens / Blocos / Pastas</h3>
+  <div id="itemsContainer"></div>
+  <button type="button" onclick="addFolder()">Adicionar Pasta</button>
+  <button type="button" onclick="addItem()">Adicionar Item</button>
 </div>
 
 <button type="button" onclick="exportPack()">Exportar</button>
 
 <script>
 let terracotaAndTiles = [
-  "minecraft:white_terracotta","minecraft:orange_terracotta","minecraft:magenta_terracotta",
-  "minecraft:light_blue_terracotta","minecraft:yellow_terracotta","minecraft:lime_terracotta",
-  "minecraft:pink_terracotta","minecraft:gray_terracotta","minecraft:light_gray_terracotta",
-  "minecraft:cyan_terracotta","minecraft:purple_terracotta","minecraft:blue_terracotta",
-  "minecraft:brown_terracotta","minecraft:green_terracotta","minecraft:red_terracotta",
-  "minecraft:black_terracotta",
-  "minecraft:terracotta","minecraft:bricks","minecraft:stone_bricks",
+  "white_terracotta","orange_terracotta","magenta_terracotta",
+  "light_blue_terracotta","yellow_terracotta","lime_terracotta",
+  "pink_terracotta","gray_terracotta","light_gray_terracotta",
+  "cyan_terracotta","purple_terracotta","blue_terracotta",
+  "brown_terracotta","green_terracotta","red_terracotta",
+  "black_terracotta",
+  "terracotta","minecraft:bricks","minecraft:stone_bricks",
   "minecraft:deepslate_tiles","minecraft:quartz_bricks"
+];
+
+let toolsAndItems = [
+  "wooden_sword","stone_sword","iron_sword","golden_sword","diamond_sword","netherite_sword",
+  "wooden_pickaxe","stone_pickaxe","iron_pickaxe","golden_pickaxe","diamond_pickaxe","netherite_pickaxe",
+  "wooden_axe","stone_axe","iron_axe","golden_axe","diamond_axe","netherite_axe",
+  "wooden_shovel","stone_shovel","iron_shovel","golden_shovel","diamond_shovel","netherite_shovel",
+  "wooden_hoe","stone_hoe","iron_hoe","golden_hoe","diamond_hoe","netherite_hoe",
+  "stick","apple","bread","diamond","iron_ingot"
 ];
 
 let currentId = null;
 
-function setPage(page) {
+function setPage(page){
   document.getElementById('mode').value = page;
-  document.getElementById('items').innerHTML = '';
-
-  document.getElementById('pageTitle').innerHTML =
-    page === 'resource'
-    ? '<b>Modo Resource Pack</b><br><span class="small">Substitui terracotas e azulejos</span>'
-    : '<b>Modo Datapack</b><br><span class="small">Blocos customizados</span>';
-
+  document.getElementById('itemsContainer').innerHTML = '';
+  document.getElementById('pageTitle').innerHTML = page==='resource'
+    ? '<b>Modo Resource Pack</b><br><span class="small">Substitui terracotas, azulejos e blocos</span>'
+    : '<b>Modo Datapack</b><br><span class="small">Itens, ferramentas, blocos e propriedades customizadas</span>';
   saveProject();
 }
 
-function addItem() {
+function addFolder(){
+  const folderDiv = document.createElement('div');
+  folderDiv.className='folder';
+  folderDiv.innerHTML=`
+    <label>Nome da Pasta</label>
+    <input class="folderName" value="Nova Pasta">
+    <button type="button" onclick="addItem(this.parentNode)">Adicionar Item nesta Pasta</button>
+    <div class="folderItems"></div>
+  `;
+  document.getElementById('itemsContainer').appendChild(folderDiv);
+}
+
+function addItem(parent=null){
   const mode = document.getElementById('mode').value;
-  if (mode === 'resource' && terracotaAndTiles.length === 0) {
-    alert("Todos os blocos base já foram usados!");
-    return;
-  }
+  const container = parent ? parent.querySelector('.folderItems') : document.getElementById('itemsContainer');
 
-  const div = document.createElement('div');
-  div.className = 'item';
+  const div=document.createElement('div');
+  div.className='item';
 
-  if (mode === 'resource') {
-    div.innerHTML = `
-      <label>Bloco base</label>
-      <select class="target">
-        ${terracotaAndTiles.map(b => `<option>${b}</option>`).join('')}
-      </select>
-
-      <label>Nome no jogo</label>
-      <input class="itemName" readonly>
-
-      <label>Nome da textura</label>
-      <input class="texName">
-
-      <label>Textura PNG (256x256)</label>
-      <input type="file" class="image" accept="image/png">
-    `;
-
-    const targetSelect = div.querySelector('.target');
-    const nameInput = div.querySelector('.itemName');
-
-    // Nome igual ao bloco base
-    nameInput.value = targetSelect.value;
-
-    // Atualiza nome ao mudar seleção (embora aqui só ocorra uma vez)
-    targetSelect.addEventListener('change', () => {
-      nameInput.value = targetSelect.value;
-    });
-
-    // Remover o bloco escolhido da lista global
-    targetSelect.addEventListener('change', () => {
-      removeFromTerracota(targetSelect.value);
-      refreshTargetOptions();
-    });
-
+  let optionsSelect='';
+  if(mode==='resource') {
+    optionsSelect=terracotaAndTiles.map(b=>`<option>${b}</option>`).join('');
   } else {
-    div.innerHTML = `
-      <label>Nome do bloco</label>
-      <input class="itemName">
-
-      <label>ID interno</label>
-      <input class="texName">
-
-      <label>Textura PNG</label>
-      <input type="file" class="image" accept="image/png">
-
-      <label><input type="checkbox" class="rotate"> Permitir rotação</label>
-      <label><input type="checkbox" class="crafting" checked> Habilitar crafting</label>
-
-      <label>Modelo personalizado (JSON)</label>
-      <input type="file" class="modelJSON" accept=".json">
-
-      <p class="small">Bloco customizado via datapack</p>
-    `;
+    optionsSelect=toolsAndItems.map(b=>`<option>${b}</option>`).join('');
   }
 
-  document.getElementById('items').appendChild(div);
+  div.innerHTML=`
+    <label>Tipo de Item</label>
+    <select class="itemType">${optionsSelect}</select>
 
-  if (mode === 'resource') {
-    // Remove o bloco usado imediatamente
-    removeFromTerracota(targetSelect.value);
-    refreshTargetOptions();
-  }
+    <label>Nome do Item</label>
+    <input class="itemName" placeholder="Nome no jogo">
 
-  saveProject();
+    <label>Nome da textura / ID</label>
+    <input class="texName">
+
+    <label>Textura PNG</label>
+    <input type="file" class="image" accept="image/png">
+
+    <label><input type="checkbox" class="rotate"> Permitir rotação</label>
+    <label><input type="checkbox" class="crafting" checked> Habilitar crafting</label>
+
+    <label>Dano / Durabilidade</label>
+    <input type="number" class="damage" value="0">
+
+    <label>Inflamável</label>
+    <input type="checkbox" class="flammable">
+
+    <label>Custom JSON</label>
+    <input type="file" class="modelJSON" accept=".json">
+
+    <button type="button" onclick="removeItem(this)">Remover Item</button>
+  `;
+
+  // Remover item usado das opções globais
+  const select = div.querySelector('.itemType');
+  const val = select.value;
+  if(mode==='resource') removeFromArray(terracotaAndTiles,val);
+  else removeFromArray(toolsAndItems,val);
+  refreshSelects();
+
+  select.addEventListener('change',()=>{
+    const oldVal=div.querySelector('.itemName').value;
+    div.querySelector('.itemName').value=select.value;
+    div.querySelector('.texName').value=select.value;
+    // atualizar arrays
+    if(mode==='resource') removeFromArray(terracotaAndTiles,select.value);
+    else removeFromArray(toolsAndItems,select.value);
+    if(oldVal) addBack(oldVal,mode);
+    refreshSelects();
+  });
+
+  container.appendChild(div);
 }
 
-// Remove do array global de blocos
-function removeFromTerracota(block) {
-  terracotaAndTiles = terracotaAndTiles.filter(b => b !== block);
+function removeItem(btn){
+  const itemDiv=btn.parentNode;
+  const mode=document.getElementById('mode').value;
+  const val=itemDiv.querySelector('.itemType')?.value;
+  if(mode==='resource') addBack(val,'resource');
+  else addBack(val,'datapack');
+  itemDiv.remove();
 }
 
-// Atualiza todas as opções de select no Resource Pack
-function refreshTargetOptions() {
-  document.querySelectorAll('.item .target').forEach(sel => {
-    const selectedValue = sel.value;
-    sel.innerHTML = terracotaAndTiles.map(b => `<option${b === selectedValue ? " selected" : ""}>${b}</option>`).join('');
+function removeFromArray(arr,val){
+  const index=arr.indexOf(val);
+  if(index>-1) arr.splice(index,1);
+}
+
+function addBack(val,mode){
+  if(!val) return;
+  if(mode==='resource' && !terracotaAndTiles.includes(val)) terracotaAndTiles.push(val);
+  if(mode==='datapack' && !toolsAndItems.includes(val)) toolsAndItems.push(val);
+}
+
+function refreshSelects(){
+  document.querySelectorAll('.itemType').forEach(sel=>{
+    const val=sel.value;
+    const options=document.getElementById('mode').value==='resource'?terracotaAndTiles:toolsAndItems;
+    sel.innerHTML=options.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('');
   });
 }
 
-function collectData() {
+function collectData(){
+  const items=[...document.querySelectorAll('#itemsContainer .item')].map(el=>({
+    name: el.querySelector('.itemName')?.value,
+    tex: el.querySelector('.texName')?.value || el.querySelector('.itemName')?.value,
+    type: el.querySelector('.itemType')?.value,
+    rotate: el.querySelector('.rotate')?.checked,
+    crafting: el.querySelector('.crafting')?.checked,
+    damage: el.querySelector('.damage')?.value,
+    flammable: el.querySelector('.flammable')?.checked,
+    modelJSON: el.querySelector('.modelJSON')?.files[0] || null
+  }));
+
+  const folders=[...document.querySelectorAll('.folder')].map(f=>({
+    name: f.querySelector('.folderName').value,
+    items:[...f.querySelectorAll('.item')].map(el=>({
+      name: el.querySelector('.itemName')?.value,
+      tex: el.querySelector('.texName')?.value || el.querySelector('.itemName')?.value,
+      type: el.querySelector('.itemType')?.value,
+      rotate: el.querySelector('.rotate')?.checked,
+      crafting: el.querySelector('.crafting')?.checked,
+      damage: el.querySelector('.damage')?.value,
+      flammable: el.querySelector('.flammable')?.checked,
+      modelJSON: el.querySelector('.modelJSON')?.files[0] || null
+    }))
+  }));
+
   return {
     mode: document.getElementById('mode').value,
     name: document.getElementById('projectName').value,
     desc: document.getElementById('projectDesc').value,
-    items: [...document.querySelectorAll('.item')].map(el => ({
-      name: el.querySelector('.itemName')?.value,
-      tex: el.querySelector('.texName')?.value || el.querySelector('.itemName')?.value,
-      target: el.querySelector('.target')?.value || null,
-      rotate: el.querySelector('.rotate')?.checked || false,
-      crafting: el.querySelector('.crafting')?.checked || false,
-      modelJSON: el.querySelector('.modelJSON')?.files[0] || null
-    }))
+    items, folders
   };
 }
 
-function saveProject() {
-  try {
-    const data = collectData();
-    if (!currentId) currentId = Date.now().toString();
-    localStorage.setItem('project_' + currentId, JSON.stringify(data));
+function saveProject(){
+  try{
+    const data=collectData();
+    if(!currentId) currentId=Date.now().toString();
+    localStorage.setItem('project_'+currentId,JSON.stringify(data));
     refreshProjects();
-  } catch {}
+  }catch{}
 }
 
-function refreshProjects() {
-  const sel = document.getElementById('savedProjects');
-  sel.innerHTML = '<option value="">— selecionar —</option>';
-
-  Object.keys(localStorage)
-    .filter(k => k.startsWith('project_'))
-    .forEach(k => {
-      try {
-        const data = JSON.parse(localStorage.getItem(k));
-        const opt = document.createElement('option');
-        opt.value = k.replace('project_', '');
-        opt.textContent = data.name || '(sem nome)';
-        sel.appendChild(opt);
-      } catch {}
-    });
-}
-
-function loadProject() {
-  const id = document.getElementById('savedProjects').value;
-  if (!id) return;
-
-  currentId = id;
-  const data = JSON.parse(localStorage.getItem('project_' + id));
-
-  document.getElementById('mode').value = data.mode;
-  document.getElementById('projectName').value = data.name;
-  document.getElementById('projectDesc').value = data.desc;
-  document.getElementById('items').innerHTML = '';
-
-  data.items.forEach(i => {
-    addItem();
-    const items = document.querySelectorAll('.item');
-    const last = items[items.length - 1];
-    last.querySelector('.itemName').value = i.name;
-    last.querySelector('.texName').value = i.tex;
-    if (i.target && last.querySelector('.target')) {
-      last.querySelector('.target').value = i.target;
-      last.querySelector('.itemName').value = i.target;
-      removeFromTerracota(i.target);
-      refreshTargetOptions();
-    }
-    if (i.rotate) last.querySelector('.rotate').checked = true;
-    if (i.crafting) last.querySelector('.crafting').checked = true;
+function refreshProjects(){
+  const sel=document.getElementById('savedProjects');
+  sel.innerHTML='<option value="">— selecionar —</option>';
+  Object.keys(localStorage).filter(k=>k.startsWith('project_')).forEach(k=>{
+    try{
+      const data=JSON.parse(localStorage.getItem(k));
+      const opt=document.createElement('option');
+      opt.value=k.replace('project_','');
+      opt.textContent=data.name||'(sem nome)';
+      sel.appendChild(opt);
+    }catch{}
   });
 }
 
-function newProject() {
-  currentId = null;
-  document.getElementById('items').innerHTML = '';
-  document.getElementById('projectName').value = '';
-  document.getElementById('projectDesc').value = '';
-  // Resetar blocos disponíveis
-  terracotaAndTiles = [
-    "minecraft:white_terracotta","minecraft:orange_terracotta","minecraft:magenta_terracotta",
-    "minecraft:light_blue_terracotta","minecraft:yellow_terracotta","minecraft:lime_terracotta",
-    "minecraft:pink_terracotta","minecraft:gray_terracotta","minecraft:light_gray_terracotta",
-    "minecraft:cyan_terracotta","minecraft:purple_terracotta","minecraft:blue_terracotta",
-    "minecraft:brown_terracotta","minecraft:green_terracotta","minecraft:red_terracotta",
-    "minecraft:black_terracotta",
-    "minecraft:terracotta","minecraft:bricks","minecraft:stone_bricks",
-    "minecraft:deepslate_tiles","minecraft:quartz_bricks"
+function loadProject(){
+  const id=document.getElementById('savedProjects').value;
+  if(!id) return;
+  currentId=id;
+  const data=JSON.parse(localStorage.getItem('project_'+id));
+  document.getElementById('mode').value=data.mode;
+  document.getElementById('projectName').value=data.name;
+  document.getElementById('projectDesc').value=data.desc;
+  document.getElementById('itemsContainer').innerHTML='';
+
+  data.folders.forEach(f=>{
+    addFolder();
+    const folder=document.querySelectorAll('.folder');
+    const last=folder[folder.length-1];
+    last.querySelector('.folderName').value=f.name;
+    f.items.forEach(i=>{
+      addItem(last);
+      const items=last.querySelectorAll('.item');
+      const lastItem=items[items.length-1];
+      lastItem.querySelector('.itemName').value=i.name;
+      lastItem.querySelector('.texName').value=i.tex;
+      lastItem.querySelector('.itemType').value=i.type;
+      lastItem.querySelector('.rotate').checked=i.rotate;
+      lastItem.querySelector('.crafting').checked=i.crafting;
+      lastItem.querySelector('.damage').value=i.damage;
+      lastItem.querySelector('.flammable').checked=i.flammable;
+    });
+  });
+
+  data.items.forEach(i=>{
+    addItem();
+    const items=document.querySelectorAll('#itemsContainer .item');
+    const lastItem=items[items.length-1];
+    lastItem.querySelector('.itemName').value=i.name;
+    lastItem.querySelector('.texName').value=i.tex;
+    lastItem.querySelector('.itemType').value=i.type;
+    lastItem.querySelector('.rotate').checked=i.rotate;
+    lastItem.querySelector('.crafting').checked=i.crafting;
+    lastItem.querySelector('.damage').value=i.damage;
+    lastItem.querySelector('.flammable').checked=i.flammable;
+  });
+}
+
+function newProject(){
+  currentId=null;
+  document.getElementById('itemsContainer').innerHTML='';
+  document.getElementById('projectName').value='';
+  document.getElementById('projectDesc').value='';
+  terracotaAndTiles=[
+    "white_terracotta","orange_terracotta","magenta_terracotta",
+    "light_blue_terracotta","yellow_terracotta","lime_terracotta",
+    "pink_terracotta","gray_terracotta","light_gray_terracotta",
+    "cyan_terracotta","purple_terracotta","blue_terracotta",
+    "brown_terracotta","green_terracotta","red_terracotta",
+    "black_terracotta",
+    "terracotta","minecraft:bricks","minecraft:stone_bricks"
+  ];
+  toolsAndItems=[
+    "wooden_sword","stone_sword","iron_sword","golden_sword","diamond_sword","netherite_sword",
+    "wooden_pickaxe","stone_pickaxe","iron_pickaxe","golden_pickaxe","diamond_pickaxe","netherite_pickaxe",
+    "wooden_axe","stone_axe","iron_axe","golden_axe","diamond_axe","netherite_axe",
+    "wooden_shovel","stone_shovel","iron_shovel","golden_shovel","diamond_shovel","netherite_shovel",
+    "wooden_hoe","stone_hoe","iron_hoe","golden_hoe","diamond_hoe","netherite_hoe",
+    "stick","apple","bread","diamond","iron_ingot"
   ];
 }
 
-async function exportPack() {
-  try {
-    const data = collectData();
-    const zip = new JSZip();
+async function exportPack(){
+  try{
+    const data=collectData();
+    const zip=new JSZip();
+    if(data.mode==='resource'){
+      const rp=zip.folder(data.name||'resourcepack');
+      rp.file("pack.mcmeta",JSON.stringify({pack:{pack_format:15,description:data.desc||"Resource Pack"}},null,2));
+      const assets=rp.folder("assets/minecraft/textures/block");
 
-    if (data.mode === 'resource') {
-      const rp = zip.folder(data.name || 'resourcepack');
-      rp.file("pack.mcmeta", JSON.stringify({
-        pack: { pack_format: 15, description: data.desc || "Resource Pack" }
-      }, null, 2));
-
-      const assets = rp.folder("assets/minecraft/textures/block");
-
-      for (let i = 0; i < data.items.length; i++) {
-        const itemEl = document.querySelectorAll('.item')[i];
-        const fileInput = itemEl.querySelector('.image');
-        const file = fileInput.files[0];
-        if (file) {
-          const arrayBuffer = await file.arrayBuffer();
-          const texName = data.items[i].tex || file.name;
-          assets.file(texName + ".png", arrayBuffer);
+      data.items.concat(...data.folders.map(f=>f.items)).forEach(async(item)=>{
+        const fileInput=document.querySelectorAll('.item').item(0).querySelector('.image');
+        const file=fileInput?.files[0];
+        if(file){
+          const arrayBuffer=await file.arrayBuffer();
+          assets.file(item.tex+".png",arrayBuffer);
         }
-      }
+      });
 
-    } else {
-      const dp = zip.folder(data.name || 'datapack');
-      dp.file("pack.mcmeta", JSON.stringify({
-        pack: { pack_format: 15, description: data.desc || "Datapack" }
-      }, null, 2));
+    }else{
+      const dp=zip.folder(data.name||'datapack');
+      dp.file("pack.mcmeta",JSON.stringify({pack:{pack_format:15,description:data.desc||"Datapack"}},null,2));
+      const dataFolder=dp.folder("data/custom_namespace");
+      const recipes=dataFolder.folder("recipes");
+      const blocks=dataFolder.folder("blocks");
+      const functions=dataFolder.folder("functions");
+      let giveAllContent='';
 
-      const dataFolder = dp.folder("data/custom_namespace");
-      const recipes = dataFolder.folder("recipes");
-      const blocks = dataFolder.folder("blocks");
-      const functions = dataFolder.folder("functions");
-
-      let giveAllContent = '';
-
-      for (let i = 0; i < data.items.length; i++) {
-        const item = data.items[i];
-        const itemEl = document.querySelectorAll('.item')[i];
-        const fileInput = itemEl.querySelector('.image');
-        const file = fileInput.files[0];
-        const modelFile = itemEl.querySelector('.modelJSON')?.files[0];
-
-        if (file) {
-          const arrayBuffer = await file.arrayBuffer();
-          blocks.file(item.tex + ".png", arrayBuffer);
+      data.items.concat(...data.folders.map(f=>f.items)).forEach(async(item)=>{
+        const fileInput=document.querySelectorAll('.item').item(0).querySelector('.image');
+        const file=fileInput?.files[0];
+        const modelFile=document.querySelectorAll('.item').item(0).querySelector('.modelJSON')?.files[0];
+        if(file){
+          const arrayBuffer=await file.arrayBuffer();
+          blocks.file(item.tex+".png",arrayBuffer);
         }
-
-        if (modelFile) {
-          const modelBuffer = await modelFile.arrayBuffer();
-          blocks.file(item.tex + ".json", modelBuffer);
+        if(modelFile){
+          const modelBuffer=await modelFile.arrayBuffer();
+          blocks.file(item.tex+".json",modelBuffer);
         }
-
-        if (item.crafting) {
-          recipes.file(item.tex + ".json", JSON.stringify({
-            type: "minecraft:crafting_shaped",
-            pattern: ["###","###","###"],
-            key: { "#": { item: "minecraft:stone" } },
-            result: { item: `custom_namespace:${item.tex}`, count: 1 }
-          }, null, 2));
+        if(item.crafting){
+          recipes.file(item.tex+".json",JSON.stringify({
+            type:"minecraft:crafting_shaped",
+            pattern:["###","###","###"],
+            key:{"#":{item:"minecraft:stone"}},
+            result:{item:`custom_namespace:${item.tex}`,count:1}
+          },null,2));
         }
+        giveAllContent+=`give @p custom_namespace:${item.tex} 1\n`;
+      });
 
-        giveAllContent += `give @p custom_namespace:${item.tex} 1\n`;
-      }
-
-      functions.file("giveall.mcfunction", giveAllContent);
+      functions.file("giveall.mcfunction",giveAllContent);
     }
 
-    const content = await zip.generateAsync({ type: "blob" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(content);
-    a.download = (data.name || "minecraft_pack") + ".zip";
+    const content=await zip.generateAsync({type:"blob"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(content);
+    a.download=(data.name||"minecraft_pack")+".zip";
     a.click();
     URL.revokeObjectURL(a.href);
-  } catch(e) {
-    alert("Erro ao exportar: " + e.message);
-    console.error(e);
-  }
+
+  }catch(e){alert("Erro ao exportar:"+e.message);console.error(e);}
 }
 
 refreshProjects();
 setPage('resource');
 </script>
-
 </body>
 </html>
