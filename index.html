@@ -12,7 +12,7 @@ body {
   font-family: Arial, sans-serif;
   background: white;
   color: black;
-  max-width: 520px;
+  max-width: 600px;
   margin: auto;
   padding: 20px;
 }
@@ -142,6 +142,12 @@ function addItem() {
       <label>Textura PNG</label>
       <input type="file" class="image" accept="image/png">
 
+      <label><input type="checkbox" class="rotate"> Permitir rotação</label>
+      <label><input type="checkbox" class="crafting" checked> Habilitar crafting</label>
+
+      <label>Modelo personalizado (JSON)</label>
+      <input type="file" class="modelJSON" accept=".json">
+
       <p class="small">Bloco customizado via datapack</p>
     `;
   }
@@ -158,7 +164,10 @@ function collectData() {
     items: [...document.querySelectorAll('.item')].map(el => ({
       name: el.querySelector('.itemName')?.value,
       tex: el.querySelector('.texName')?.value,
-      target: el.querySelector('.target')?.value || null
+      target: el.querySelector('.target')?.value || null,
+      rotate: el.querySelector('.rotate')?.checked || false,
+      crafting: el.querySelector('.crafting')?.checked || false,
+      modelJSON: el.querySelector('.modelJSON')?.files[0] || null
     }))
   };
 }
@@ -210,6 +219,8 @@ function loadProject() {
     if (i.target && last.querySelector('.target')) {
       last.querySelector('.target').value = i.target;
     }
+    if (i.rotate) last.querySelector('.rotate').checked = true;
+    if (i.crafting) last.querySelector('.crafting').checked = true;
   });
 }
 
@@ -220,8 +231,87 @@ function newProject() {
   document.getElementById('projectDesc').value = '';
 }
 
-function exportPack() {
-  alert('Exportação ZIP pode ser implementada agora sem bugs.');
+async function exportPack() {
+  const data = collectData();
+  const zip = new JSZip();
+
+  if (data.mode === 'resource') {
+    // Resource Pack
+    const rp = zip.folder(data.name || 'resourcepack');
+    rp.file("pack.mcmeta", JSON.stringify({
+      pack: { pack_format: 15, description: data.desc || "Resource Pack" }
+    }, null, 2));
+
+    const assets = rp.folder("assets/minecraft/textures/block");
+
+    for (let i = 0; i < data.items.length; i++) {
+      const itemEl = document.querySelectorAll('.item')[i];
+      const fileInput = itemEl.querySelector('.image');
+      const file = fileInput.files[0];
+      if (file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const texName = data.items[i].tex || file.name;
+        assets.file(texName + ".png", arrayBuffer);
+      }
+    }
+
+  } else {
+    // Datapack
+    const dp = zip.folder(data.name || 'datapack');
+    dp.file("pack.mcmeta", JSON.stringify({
+      pack: { pack_format: 15, description: data.desc || "Datapack" }
+    }, null, 2));
+
+    const dataFolder = dp.folder("data/custom_namespace");
+    const recipes = dataFolder.folder("recipes");
+    const blocks = dataFolder.folder("blocks");
+    const functions = dataFolder.folder("functions");
+
+    // Função /giveall
+    let giveAllContent = '';
+    
+    for (let i = 0; i < data.items.length; i++) {
+      const item = data.items[i];
+      const itemEl = document.querySelectorAll('.item')[i];
+      const fileInput = itemEl.querySelector('.image');
+      const file = fileInput.files[0];
+      const modelFile = itemEl.querySelector('.modelJSON')?.files[0];
+
+      if (file) {
+        const arrayBuffer = await file.arrayBuffer();
+        blocks.file(item.tex + ".png", arrayBuffer);
+      }
+
+      // Copiar modelo JSON se tiver
+      if (modelFile) {
+        const modelBuffer = await modelFile.arrayBuffer();
+        blocks.file(item.tex + ".json", modelBuffer);
+      }
+
+      // Recipe automático se habilitado
+      if (item.crafting) {
+        recipes.file(item.tex + ".json", JSON.stringify({
+          type: "minecraft:crafting_shaped",
+          pattern: ["###", "###", "###"],
+          key: { "#": { item: "minecraft:stone" } },
+          result: { item: `custom_namespace:${item.tex}`, count: 1 }
+        }, null, 2));
+      }
+
+      // Adiciona linha no giveall
+      giveAllContent += `give @p custom_namespace:${item.tex} 1\n`;
+    }
+
+    functions.file("giveall.mcfunction", giveAllContent);
+  }
+
+  zip.generateAsync({ type: "blob" }).then(function(content) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(content);
+    a.download = (data.name || "minecraft_pack") + ".zip";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
 }
 
 refreshProjects();
