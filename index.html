@@ -101,6 +101,7 @@ let allTerracotas=[
 let availableBlocks=[...allTerracotas]; // blocos disponíveis
 let currentId=null;
 let uploadedImages={}; // armazenar imagens carregadas por item
+let displayNames={}; // nome no jogo
 
 function refreshBlockSelector(){
   const selector=document.getElementById('blockSelector');
@@ -133,7 +134,7 @@ function addItem(parent=null){
   div.innerHTML=`
     <div class="item-header">Bloco: <span class="itemType">${selectedBlock}</span> 
       <button onclick="openItemConfig(this)">Configurar</button> 
-      <button onclick="removeItem(this, true)">${parent?'Remover':'Remover'}</button>
+      <button onclick="removeItem(this, true)">Remover</button>
     </div>`;
   container.appendChild(div);
 
@@ -144,11 +145,12 @@ function addItem(parent=null){
 
 function openItemConfig(btn){
   const itemDiv=btn.closest('.item');
+  const itemName=itemDiv.querySelector('.itemType').textContent;
   const popup=document.getElementById('popup');
   popup.innerHTML=`
-    <h2>Configuração: ${itemDiv.querySelector('.itemType').textContent}</h2>
-    <label>Nome do bloco</label>
-    <input id="configName" value="${itemDiv.querySelector('.itemType').textContent}" readonly>
+    <h2>Configuração: ${itemName}</h2>
+    <label>Nome no jogo</label>
+    <input id="displayName" value="${displayNames[itemName] || itemName}">
     <label>Selecionar imagem (PNG)</label>
     <input type="file" id="configImage" accept="image/png">
     <button onclick="saveItemConfig()">Salvar</button>
@@ -159,7 +161,11 @@ function openItemConfig(btn){
 
   document.getElementById('configImage').addEventListener('change',(e)=>{
     const file=e.target.files[0];
-    if(file) uploadedImages[itemDiv.querySelector('.itemType').textContent]=file;
+    if(file) uploadedImages[itemName]=file;
+  });
+
+  document.getElementById('displayName').addEventListener('input',(e)=>{
+    displayNames[itemName]=e.target.value;
   });
 }
 
@@ -170,6 +176,7 @@ function removeItem(btn, restore=true){
   const blockName = btn.closest('.item').querySelector('.itemType').textContent;
   if(restore) { availableBlocks.push(blockName); refreshBlockSelector(); }
   delete uploadedImages[blockName];
+  delete displayNames[blockName];
   btn.closest('.item').remove(); 
 }
 
@@ -217,6 +224,7 @@ function loadProject(){
   document.getElementById('projectDesc').value=data.desc;
   document.getElementById('itemsContainer').innerHTML='';
   uploadedImages={};
+  displayNames={};
   availableBlocks=[...allTerracotas];
 
   data.items.forEach(item=>{
@@ -237,6 +245,7 @@ function newProject(){
   document.getElementById('projectName').value=''; 
   document.getElementById('projectDesc').value=''; 
   uploadedImages={};
+  displayNames={};
   availableBlocks=[...allTerracotas];
   refreshBlockSelector();
 }
@@ -248,6 +257,7 @@ async function exportPack(){
     const rp=zip.folder(data.name||'resourcepack');
     rp.file("pack.mcmeta",JSON.stringify({pack:{pack_format:15,description:data.desc||"Resource Pack"}},null,2));
 
+    // Texturas
     const assets=rp.folder("assets").folder("minecraft").folder("textures").folder("block");
     for(const item of data.items){
       const file=uploadedImages[item.name];
@@ -256,6 +266,14 @@ async function exportPack(){
         assets.file(item.name+".png",content);
       }
     }
+
+    // Nome no jogo
+    const langFolder=rp.folder("assets").folder("minecraft").folder("lang");
+    const langObj={};
+    for(const item of data.items){
+      langObj["block.minecraft."+item.name]=displayNames[item.name]||item.name;
+    }
+    langFolder.file("pt_br.json",JSON.stringify(langObj,null,2));
 
     const content=await zip.generateAsync({type:"blob"});
     const a=document.createElement("a"); 
