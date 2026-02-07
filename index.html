@@ -17,34 +17,64 @@ body {
   padding: 20px;
 }
 
-h1 { font-size: 22px; }
+h1 { font-size: 24px; margin-bottom: 20px; text-align: center; }
 
 .card {
   background: #e0e0e0;
-  padding: 14px;
+  padding: 16px;
   border-radius: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
 }
 
 button, input, select, textarea {
   width: 100%;
-  margin-top: 6px;
-  padding: 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  font-size: 14px;
 }
 
 button {
   cursor: pointer;
   font-weight: bold;
+  border: none;
+  background: #d0d0d0;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+button:hover {
+  background: #c0c0c0;
 }
 
 .item {
   background: #f0f0f0;
-  padding: 10px;
-  margin-top: 10px;
+  padding: 12px;
+  margin-top: 12px;
   border-radius: 6px;
+  box-sizing: border-box;
 }
 
-.small { font-size: 12px; opacity: 0.7; }
+.small { font-size: 12px; opacity: 0.7; display: block; margin-top: 4px; }
+
+input[type="checkbox"] {
+  width: auto;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+input[type="file"] {
+  padding: 4px;
+}
+
+textarea {
+  resize: vertical;
+}
+
+select {
+  padding: 6px;
+}
 </style>
 </head>
 
@@ -85,7 +115,7 @@ button {
 <button type="button" onclick="exportPack()">Exportar</button>
 
 <script>
-const terracotaAndTiles = [
+let terracotaAndTiles = [
   "minecraft:white_terracotta","minecraft:orange_terracotta","minecraft:magenta_terracotta",
   "minecraft:light_blue_terracotta","minecraft:yellow_terracotta","minecraft:lime_terracotta",
   "minecraft:pink_terracotta","minecraft:gray_terracotta","minecraft:light_gray_terracotta",
@@ -112,18 +142,23 @@ function setPage(page) {
 
 function addItem() {
   const mode = document.getElementById('mode').value;
+  if (mode === 'resource' && terracotaAndTiles.length === 0) {
+    alert("Todos os blocos base já foram usados!");
+    return;
+  }
+
   const div = document.createElement('div');
   div.className = 'item';
 
   if (mode === 'resource') {
     div.innerHTML = `
-      <label>Nome no jogo</label>
-      <input class="itemName">
-
       <label>Bloco base</label>
       <select class="target">
         ${terracotaAndTiles.map(b => `<option>${b}</option>`).join('')}
       </select>
+
+      <label>Nome no jogo</label>
+      <input class="itemName" readonly>
 
       <label>Nome da textura</label>
       <input class="texName">
@@ -131,6 +166,24 @@ function addItem() {
       <label>Textura PNG (256x256)</label>
       <input type="file" class="image" accept="image/png">
     `;
+
+    const targetSelect = div.querySelector('.target');
+    const nameInput = div.querySelector('.itemName');
+
+    // Nome igual ao bloco base
+    nameInput.value = targetSelect.value;
+
+    // Atualiza nome ao mudar seleção (embora aqui só ocorra uma vez)
+    targetSelect.addEventListener('change', () => {
+      nameInput.value = targetSelect.value;
+    });
+
+    // Remover o bloco escolhido da lista global
+    targetSelect.addEventListener('change', () => {
+      removeFromTerracota(targetSelect.value);
+      refreshTargetOptions();
+    });
+
   } else {
     div.innerHTML = `
       <label>Nome do bloco</label>
@@ -153,7 +206,27 @@ function addItem() {
   }
 
   document.getElementById('items').appendChild(div);
+
+  if (mode === 'resource') {
+    // Remove o bloco usado imediatamente
+    removeFromTerracota(targetSelect.value);
+    refreshTargetOptions();
+  }
+
   saveProject();
+}
+
+// Remove do array global de blocos
+function removeFromTerracota(block) {
+  terracotaAndTiles = terracotaAndTiles.filter(b => b !== block);
+}
+
+// Atualiza todas as opções de select no Resource Pack
+function refreshTargetOptions() {
+  document.querySelectorAll('.item .target').forEach(sel => {
+    const selectedValue = sel.value;
+    sel.innerHTML = terracotaAndTiles.map(b => `<option${b === selectedValue ? " selected" : ""}>${b}</option>`).join('');
+  });
 }
 
 function collectData() {
@@ -163,7 +236,7 @@ function collectData() {
     desc: document.getElementById('projectDesc').value,
     items: [...document.querySelectorAll('.item')].map(el => ({
       name: el.querySelector('.itemName')?.value,
-      tex: el.querySelector('.texName')?.value,
+      tex: el.querySelector('.texName')?.value || el.querySelector('.itemName')?.value,
       target: el.querySelector('.target')?.value || null,
       rotate: el.querySelector('.rotate')?.checked || false,
       crafting: el.querySelector('.crafting')?.checked || false,
@@ -218,6 +291,9 @@ function loadProject() {
     last.querySelector('.texName').value = i.tex;
     if (i.target && last.querySelector('.target')) {
       last.querySelector('.target').value = i.target;
+      last.querySelector('.itemName').value = i.target;
+      removeFromTerracota(i.target);
+      refreshTargetOptions();
     }
     if (i.rotate) last.querySelector('.rotate').checked = true;
     if (i.crafting) last.querySelector('.crafting').checked = true;
@@ -229,89 +305,98 @@ function newProject() {
   document.getElementById('items').innerHTML = '';
   document.getElementById('projectName').value = '';
   document.getElementById('projectDesc').value = '';
+  // Resetar blocos disponíveis
+  terracotaAndTiles = [
+    "minecraft:white_terracotta","minecraft:orange_terracotta","minecraft:magenta_terracotta",
+    "minecraft:light_blue_terracotta","minecraft:yellow_terracotta","minecraft:lime_terracotta",
+    "minecraft:pink_terracotta","minecraft:gray_terracotta","minecraft:light_gray_terracotta",
+    "minecraft:cyan_terracotta","minecraft:purple_terracotta","minecraft:blue_terracotta",
+    "minecraft:brown_terracotta","minecraft:green_terracotta","minecraft:red_terracotta",
+    "minecraft:black_terracotta",
+    "minecraft:terracotta","minecraft:bricks","minecraft:stone_bricks",
+    "minecraft:deepslate_tiles","minecraft:quartz_bricks"
+  ];
 }
 
 async function exportPack() {
-  const data = collectData();
-  const zip = new JSZip();
+  try {
+    const data = collectData();
+    const zip = new JSZip();
 
-  if (data.mode === 'resource') {
-    // Resource Pack
-    const rp = zip.folder(data.name || 'resourcepack');
-    rp.file("pack.mcmeta", JSON.stringify({
-      pack: { pack_format: 15, description: data.desc || "Resource Pack" }
-    }, null, 2));
+    if (data.mode === 'resource') {
+      const rp = zip.folder(data.name || 'resourcepack');
+      rp.file("pack.mcmeta", JSON.stringify({
+        pack: { pack_format: 15, description: data.desc || "Resource Pack" }
+      }, null, 2));
 
-    const assets = rp.folder("assets/minecraft/textures/block");
+      const assets = rp.folder("assets/minecraft/textures/block");
 
-    for (let i = 0; i < data.items.length; i++) {
-      const itemEl = document.querySelectorAll('.item')[i];
-      const fileInput = itemEl.querySelector('.image');
-      const file = fileInput.files[0];
-      if (file) {
-        const arrayBuffer = await file.arrayBuffer();
-        const texName = data.items[i].tex || file.name;
-        assets.file(texName + ".png", arrayBuffer);
+      for (let i = 0; i < data.items.length; i++) {
+        const itemEl = document.querySelectorAll('.item')[i];
+        const fileInput = itemEl.querySelector('.image');
+        const file = fileInput.files[0];
+        if (file) {
+          const arrayBuffer = await file.arrayBuffer();
+          const texName = data.items[i].tex || file.name;
+          assets.file(texName + ".png", arrayBuffer);
+        }
       }
+
+    } else {
+      const dp = zip.folder(data.name || 'datapack');
+      dp.file("pack.mcmeta", JSON.stringify({
+        pack: { pack_format: 15, description: data.desc || "Datapack" }
+      }, null, 2));
+
+      const dataFolder = dp.folder("data/custom_namespace");
+      const recipes = dataFolder.folder("recipes");
+      const blocks = dataFolder.folder("blocks");
+      const functions = dataFolder.folder("functions");
+
+      let giveAllContent = '';
+
+      for (let i = 0; i < data.items.length; i++) {
+        const item = data.items[i];
+        const itemEl = document.querySelectorAll('.item')[i];
+        const fileInput = itemEl.querySelector('.image');
+        const file = fileInput.files[0];
+        const modelFile = itemEl.querySelector('.modelJSON')?.files[0];
+
+        if (file) {
+          const arrayBuffer = await file.arrayBuffer();
+          blocks.file(item.tex + ".png", arrayBuffer);
+        }
+
+        if (modelFile) {
+          const modelBuffer = await modelFile.arrayBuffer();
+          blocks.file(item.tex + ".json", modelBuffer);
+        }
+
+        if (item.crafting) {
+          recipes.file(item.tex + ".json", JSON.stringify({
+            type: "minecraft:crafting_shaped",
+            pattern: ["###","###","###"],
+            key: { "#": { item: "minecraft:stone" } },
+            result: { item: `custom_namespace:${item.tex}`, count: 1 }
+          }, null, 2));
+        }
+
+        giveAllContent += `give @p custom_namespace:${item.tex} 1\n`;
+      }
+
+      functions.file("giveall.mcfunction", giveAllContent);
     }
 
-  } else {
-    // Datapack
-    const dp = zip.folder(data.name || 'datapack');
-    dp.file("pack.mcmeta", JSON.stringify({
-      pack: { pack_format: 15, description: data.desc || "Datapack" }
-    }, null, 2));
-
-    const dataFolder = dp.folder("data/custom_namespace");
-    const recipes = dataFolder.folder("recipes");
-    const blocks = dataFolder.folder("blocks");
-    const functions = dataFolder.folder("functions");
-
-    // Função /giveall
-    let giveAllContent = '';
-    
-    for (let i = 0; i < data.items.length; i++) {
-      const item = data.items[i];
-      const itemEl = document.querySelectorAll('.item')[i];
-      const fileInput = itemEl.querySelector('.image');
-      const file = fileInput.files[0];
-      const modelFile = itemEl.querySelector('.modelJSON')?.files[0];
-
-      if (file) {
-        const arrayBuffer = await file.arrayBuffer();
-        blocks.file(item.tex + ".png", arrayBuffer);
-      }
-
-      // Copiar modelo JSON se tiver
-      if (modelFile) {
-        const modelBuffer = await modelFile.arrayBuffer();
-        blocks.file(item.tex + ".json", modelBuffer);
-      }
-
-      // Recipe automático se habilitado
-      if (item.crafting) {
-        recipes.file(item.tex + ".json", JSON.stringify({
-          type: "minecraft:crafting_shaped",
-          pattern: ["###", "###", "###"],
-          key: { "#": { item: "minecraft:stone" } },
-          result: { item: `custom_namespace:${item.tex}`, count: 1 }
-        }, null, 2));
-      }
-
-      // Adiciona linha no giveall
-      giveAllContent += `give @p custom_namespace:${item.tex} 1\n`;
-    }
-
-    functions.file("giveall.mcfunction", giveAllContent);
-  }
-
-  zip.generateAsync({ type: "blob" }).then(function(content) {
+    const content = await zip.generateAsync({ type: "blob" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(content);
     a.download = (data.name || "minecraft_pack") + ".zip";
     a.click();
     URL.revokeObjectURL(a.href);
-  });
+  } catch(e) {
+    alert("Erro ao exportar: " + e.message);
+    console.error(e);
+  }
 }
 
 refreshProjects();
