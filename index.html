@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Gerador Minecraft – Resource Pack & Datapack</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
 <style>
 body {
   font-family: Arial, sans-serif;
@@ -34,13 +35,19 @@ button { background: #cfcfcf; cursor: pointer; font-weight: bold; }
 .small { font-size: 12px; opacity: 0.8; }
 </style>
 </head>
+
 <body>
 
 <h1>Gerador Minecraft</h1>
 
+<!-- MODE (CORREÇÃO CRÍTICA) -->
+<input type="hidden" id="mode" value="resource">
+
 <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
-  <button onclick="setPage('resource')" style="flex:1">Resource Pack</button>
-  <button onclick="setPage('datapack')" style="flex:1">Datapack</button>
+  <button type="button" onclick="setPage('resource')" style="flex:1">Resource Pack</button>
+  <button type="button" onclick="setPage('datapack')" style="flex:1">Datapack</button>
+
+  <!-- ÚNICO savedProjects -->
   <select id="savedProjects" onchange="loadProject()" style="flex:1; background:transparent; border:none; border-bottom:1px solid #aaa; border-radius:0; padding:6px;">
     <option value="">Projetos salvos</option>
   </select>
@@ -49,26 +56,22 @@ button { background: #cfcfcf; cursor: pointer; font-weight: bold; }
 <div class="card" id="pageTitle"></div>
 
 <div class="card">
-  <label>Projetos salvos</label>
-  <select id="savedProjects" onchange="loadProject()"></select>
-  <button onclick="newProject()">Novo projeto</button>
-</div>
-
-<div class="card">
   <label>Nome do projeto</label>
   <input id="projectName" placeholder="Meu pack" />
 
   <label>Descrição</label>
   <textarea id="projectDesc"></textarea>
+
+  <button type="button" onclick="newProject()">Novo projeto</button>
 </div>
 
 <div class="card">
   <h3>Itens / Blocos</h3>
   <div id="items"></div>
-  <button onclick="addItem()">Adicionar</button>
+  <button type="button" onclick="addItem()">Adicionar</button>
 </div>
 
-<button onclick="exportPack()">Exportar</button>
+<button type="button" onclick="exportPack()">Exportar</button>
 
 <script>
 const terracotaAndTiles = [
@@ -89,7 +92,8 @@ function setPage(page) {
   currentPage = page;
   document.getElementById('mode').value = page;
   document.getElementById('items').innerHTML = '';
-  document.getElementById('pageTitle').innerHTML = page === 'resource'
+  document.getElementById('pageTitle').innerHTML =
+    page === 'resource'
     ? '<strong>Modo Resource Pack</strong><br><span class="small">Substituição de terracotas e azulejos</span>'
     : '<strong>Modo Datapack</strong><br><span class="small">Blocos customizados infinitos</span>';
   saveProject();
@@ -127,7 +131,7 @@ function addItem() {
       <label>Textura PNG (256x256)</label>
       <input type="file" class="image" accept="image/png" />
 
-      <p class="small">Esse bloco será um bloco customizado via datapack (entidade + modelo)</p>
+      <p class="small">Esse bloco será um bloco customizado via datapack</p>
     `;
   }
 
@@ -145,6 +149,7 @@ function saveProject() {
 function loadProject() {
   const id = document.getElementById('savedProjects').value;
   if (!id) return;
+
   currentId = id;
   const data = JSON.parse(localStorage.getItem('project_' + id));
 
@@ -155,11 +160,13 @@ function loadProject() {
 
   data.items.forEach(i => {
     addItem();
-    const el = document.querySelectorAll('.item');
-    const last = el[el.length - 1];
+    const els = document.querySelectorAll('.item');
+    const last = els[els.length - 1];
     last.querySelector('.itemName').value = i.name;
     last.querySelector('.texName').value = i.tex;
-    if (i.target && last.querySelector('.target')) last.querySelector('.target').value = i.target;
+    if (i.target && last.querySelector('.target')) {
+      last.querySelector('.target').value = i.target;
+    }
   });
 }
 
@@ -172,7 +179,7 @@ function newProject() {
 
 function refreshProjects() {
   const sel = document.getElementById('savedProjects');
-  sel.innerHTML = '<option value="">— selecionar —</option>';
+  sel.innerHTML = '<option value="">Projetos salvos</option>';
   Object.keys(localStorage)
     .filter(k => k.startsWith('project_'))
     .forEach(k => {
@@ -198,7 +205,7 @@ function collectData() {
 }
 
 function exportPack() {
-  alert('Exportação completa (ZIP) é o próximo passo. Estrutura de projetos e edição pronta.');
+  alert('Exportação ZIP é o próximo passo. Estrutura já está pronta.');
 }
 
 refreshProjects();
