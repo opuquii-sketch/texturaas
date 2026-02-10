@@ -109,6 +109,12 @@ select,input,textarea{
 
   <label><b>Importar Resource Pack (PASTA)</b></label>
   <input type="file" webkitdirectory multiple onchange="importResourcePack(this.files)">
+
+  <hr>
+
+  <label><b>Importar textura (ARQUIVO PNG)</b></label>
+  <input type="file" accept="image/png" onchange="importSingleTexture(this)">
+  <span class="small">Pode importar várias vezes, um arquivo por vez</span>
 </div>
 
 <div class="card">
@@ -164,8 +170,7 @@ async function readLang(files){
     f.webkitRelativePath.endsWith("/lang/en_us.json")
   );
   if(!langFile) return;
-  const text=await langFile.text();
-  try{ langData=JSON.parse(text); }catch{}
+  try{ langData=JSON.parse(await langFile.text()); }catch{}
 }
 
 async function importResourcePack(files){
@@ -190,6 +195,27 @@ async function importResourcePack(files){
     };
     reader.readAsDataURL(file);
   });
+}
+
+function importSingleTexture(input){
+  const file=input.files[0];
+  if(!file) return;
+
+  const id=file.name.replace(".png","");
+  const reader=new FileReader();
+  reader.onload=()=>{
+    blocks[id]={
+      id,
+      texture:reader.result,
+      displayName:blocks[id]?.displayName || prettify(id)
+    };
+    available=available.filter(b=>b!==id);
+    refreshSelector();
+    render();
+  };
+  reader.readAsDataURL(file);
+
+  input.value=""; // permite importar o mesmo nome de novo se quiser
 }
 
 function render(){
