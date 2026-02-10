@@ -2,70 +2,96 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gerador Minecraft Resource Pack</title>
+<title>Editor de Resource Pack Minecraft</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <style>
-:root{
-  --bg:#f8f8f8; --text:#222; --card:#e0e0e0;
-  --item:#f0f0f0;
-}
 body{
-  font-family:Arial,sans-serif;
-  background:var(--bg); color:var(--text);
-  max-width:1200px; margin:auto; padding:20px;
+  font-family:Arial;
+  background:#eee;
+  max-width:1200px;
+  margin:auto;
+  padding:20px;
 }
-.card{background:var(--card);padding:16px;border-radius:10px;margin-bottom:20px}
-h1{text-align:center}
-button{cursor:pointer;font-weight:bold;border:none;
-  background:#d0d0d0;border-radius:8px;padding:8px 12px}
-button:hover{background:#c0c0c0}
-input,select,textarea{width:100%;margin:6px 0;padding:6px;border-radius:6px}
-#itemsContainer{display:flex;flex-wrap:wrap;gap:12px}
-.item{background:var(--item);padding:12px;border-radius:8px;width:calc(33% - 12px)}
+
+.card{
+  background:#ddd;
+  padding:16px;
+  border-radius:10px;
+  margin-bottom:20px;
+}
+
+#itemsContainer{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:16px;
+}
+
+.item{
+  background:#f5f5f5;
+  border-radius:10px;
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
 .preview{
-  background:#fff;border-radius:6px;padding:6px;
-  text-align:center;font-weight:bold
+  background:white;
+  border-radius:8px;
+  padding:6px;
+  text-align:center;
+  font-weight:bold;
 }
-.preview img{max-width:100%;border-radius:6px}
-#overlay{position:fixed;top:0;left:0;width:100%;height:100%;
-  background:rgba(0,0,0,.4);display:none}
-#popup{position:fixed;top:50%;left:50%;
-  transform:translate(-50%,-50%);
-  background:#fff;padding:20px;border-radius:10px;
-  display:none;max-width:420px;width:90%}
+
+.preview img{
+  max-width:100%;
+  border-radius:6px;
+}
+
+button{
+  border:none;
+  border-radius:6px;
+  padding:6px;
+  cursor:pointer;
+  background:#ccc;
+}
+
+button:hover{background:#bbb}
+
+#popup,#overlay{
+  position:fixed;
+  top:0;left:0;
+  width:100%;height:100%;
+  display:none;
+}
+
+#overlay{background:rgba(0,0,0,.5)}
+#popup{
+  background:white;
+  width:400px;
+  height:auto;
+  margin:auto;
+  padding:16px;
+  border-radius:10px;
+  inset:0;
+}
 </style>
 </head>
 
 <body>
 
-<h1>Gerador Minecraft Resource Pack</h1>
+<h1>Editor de Resource Pack</h1>
 
 <div class="card">
-  <label>Projeto salvo</label>
-  <select id="projectSelect" onchange="loadProject()">
-    <option value="">— novo projeto —</option>
-  </select>
-
   <label>Nome do projeto</label>
   <input id="projectName">
 
   <label>Descrição</label>
   <textarea id="projectDesc"></textarea>
-</div>
 
-<div class="card">
-  <h3>Adicionar blocos</h3>
-
-  <label>Escolher bloco</label>
-  <select id="blockSelector"></select>
-  <button onclick="addItem()">Adicionar bloco</button>
-
-  <hr>
-
-  <label>Importar texturas (PNG)</label>
-  <input type="file" accept="image/png" multiple onchange="bulkImport(this.files)">
+  <label>Importar Resource Pack (pasta)</label>
+  <input type="file" webkitdirectory multiple onchange="importResourcePack(this.files)">
 </div>
 
 <div class="card">
@@ -73,147 +99,55 @@ input,select,textarea{width:100%;margin:6px 0;padding:6px;border-radius:6px}
   <div id="itemsContainer"></div>
 </div>
 
-<button onclick="exportPack()">Exportar (e salvar)</button>
+<button onclick="exportPack()">Exportar</button>
 
 <div id="overlay"></div>
 <div id="popup"></div>
 
 <script>
-const allBlocks=[
- "white_terracotta","orange_terracotta","magenta_terracotta",
- "light_blue_terracotta","yellow_terracotta","lime_terracotta",
- "pink_terracotta","gray_terracotta","light_gray_terracotta",
- "cyan_terracotta","purple_terracotta","blue_terracotta",
- "brown_terracotta","green_terracotta","red_terracotta",
- "black_terracotta","terracotta","bricks","stone_bricks"
-];
+let displayNames={}
+let uploadedImages={}
+let currentProjectId=null
 
-let available=[...allBlocks];
-let uploadedImages={}; // { bloco:{file,url} }
-let displayNames={};
-let currentProjectId=null;
+function importResourcePack(files){
+  newProject()
 
-/* ---------- PROJETOS ---------- */
+  projectName.value="ResourcePack Importado"
+  projectDesc.value="Importado automaticamente"
 
-function saveProject(){
-  const id=currentProjectId||("rp_"+Date.now());
-  currentProjectId=id;
+  [...files].forEach(file=>{
+    if(!file.name.endsWith(".png")) return
+    if(!file.webkitRelativePath.includes("textures/block")) return
 
-  const data={
-    name:projectName.value,
-    desc:projectDesc.value,
-    displayNames,
-    blocks:Object.keys(displayNames),
-    images:Object.fromEntries(
-      Object.entries(uploadedImages).map(([k,v])=>[k,v.url])
-    )
-  };
+    const name=file.name.replace(".png","")
 
-  localStorage.setItem(id,JSON.stringify(data));
-  refreshProjects();
-  projectSelect.value=id;
+    displayNames[name]=name.replace(/_/g," ").toUpperCase()
+    uploadedImages[name]={file,url:URL.createObjectURL(file)}
+
+    addItem(name)
+  })
+
+  saveProject()
 }
 
-function refreshProjects(){
-  projectSelect.innerHTML='<option value="">— novo projeto —</option>';
-  Object.keys(localStorage)
-    .filter(k=>k.startsWith("rp_"))
-    .forEach(k=>{
-      const d=JSON.parse(localStorage.getItem(k));
-      const o=document.createElement("option");
-      o.value=k;
-      o.textContent=d.name||"(sem nome)";
-      projectSelect.appendChild(o);
-    });
-}
-
-function loadProject(){
-  const id=projectSelect.value;
-  if(!id) return newProject();
-
-  const data=JSON.parse(localStorage.getItem(id));
-  currentProjectId=id;
-
-  projectName.value=data.name;
-  projectDesc.value=data.desc;
-
-  displayNames={...data.displayNames};
-  uploadedImages={};
-
-  document.getElementById("itemsContainer").innerHTML="";
-  available=[...allBlocks];
-
-  data.blocks.forEach(b=>{
-    available=available.filter(x=>x!==b);
-    addItem(b);
-    if(data.images[b]){
-      uploadedImages[b]={file:null,url:data.images[b]};
-      updatePreview(b);
-    }
-  });
-
-  refreshSelector();
-}
-
-function newProject(){
-  currentProjectId=null;
-  projectName.value="";
-  projectDesc.value="";
-  displayNames={};
-  uploadedImages={};
-  available=[...allBlocks];
-  itemsContainer.innerHTML="";
-  refreshSelector();
-}
-
-/* ---------- BLOCO ---------- */
-
-function refreshSelector(){
-  blockSelector.innerHTML="";
-  available.forEach(b=>{
-    const o=document.createElement("option");
-    o.value=b;o.textContent=b;
-    blockSelector.appendChild(o);
-  });
-}
-
-function addItem(block){
-  const b=block||blockSelector.value;
-  if(!b) return;
-
-  available=available.filter(x=>x!==b);
-  refreshSelector();
-
-  displayNames[b]=displayNames[b]||b;
-
-  const div=document.createElement("div");
-  div.className="item";
+function addItem(name){
+  const div=document.createElement("div")
+  div.className="item"
   div.innerHTML=`
-    <div class="preview" id="preview-${b}">${displayNames[b]}</div>
-    <button onclick="openConfig('${b}')">Configurar</button>
-    <button onclick="removeItem('${b}',this)">Remover</button>
-  `;
-  itemsContainer.appendChild(div);
-  updatePreview(b);
+    <div class="preview" id="preview-${name}"></div>
+    <button onclick="openConfig('${name}')">Configurar</button>
+    <button onclick="removeItem('${name}',this)">Remover</button>
+  `
+  itemsContainer.appendChild(div)
+  updatePreview(name)
 }
 
 function updatePreview(name){
-  const p=document.getElementById("preview-"+name);
-  if(uploadedImages[name]){
-    p.innerHTML=`<img src="${uploadedImages[name].url}"><div>${displayNames[name]}</div>`;
-  }else{
-    p.textContent=displayNames[name];
-  }
-}
-
-function bulkImport(files){
-  [...files].forEach(f=>{
-    const name=f.name.replace(".png","");
-    if(!available.includes(name)) return;
-    uploadedImages[name]={file:f,url:URL.createObjectURL(f)};
-    displayNames[name]=name.replace(/_/g," ").toUpperCase();
-    addItem(name);
-  });
+  const p=document.getElementById("preview-"+name)
+  p.innerHTML=`
+    <img src="${uploadedImages[name].url}">
+    <div>${displayNames[name]}</div>
+  `
 }
 
 function openConfig(name){
@@ -229,73 +163,81 @@ function openConfig(name){
 
     <button onclick="downloadTexture('${name}')">Baixar textura</button>
     <button onclick="closePopup()">Fechar</button>
-  `;
-  overlay.style.display="block";
-  popup.style.display="block";
+  `
+  overlay.style.display="block"
+  popup.style.display="block"
 }
 
 function setTexture(name,file){
-  uploadedImages[name]={file,url:URL.createObjectURL(file)};
-  updatePreview(name);
+  uploadedImages[name]={file,url:URL.createObjectURL(file)}
+  updatePreview(name)
 }
 
 function downloadTexture(name){
-  if(!uploadedImages[name]) return alert("Sem textura");
-  const a=document.createElement("a");
-  a.href=uploadedImages[name].url;
-  a.download=name+".png";
-  a.click();
+  const a=document.createElement("a")
+  a.href=uploadedImages[name].url
+  a.download=name+".png"
+  a.click()
 }
 
 function closePopup(){
-  popup.style.display="none";
-  overlay.style.display="none";
+  popup.style.display="none"
+  overlay.style.display="none"
 }
 
 function removeItem(name,btn){
-  delete displayNames[name];
-  delete uploadedImages[name];
-  available.push(name);
-  refreshSelector();
-  btn.parentElement.remove();
+  delete displayNames[name]
+  delete uploadedImages[name]
+  btn.closest(".item").remove()
 }
 
-/* ---------- EXPORT ---------- */
+function newProject(){
+  displayNames={}
+  uploadedImages={}
+  itemsContainer.innerHTML=""
+}
+
+function saveProject(){
+  const id="rp_"+Date.now()
+  localStorage.setItem(id,JSON.stringify({
+    name:projectName.value,
+    desc:projectDesc.value,
+    displayNames,
+    images:Object.fromEntries(
+      Object.entries(uploadedImages).map(([k,v])=>[k,v.url])
+    )
+  }))
+}
 
 async function exportPack(){
-  saveProject(); // <<< SALVA AUTOMATICAMENTE
+  saveProject()
 
-  const zip=new JSZip();
-  const root=zip.folder(projectName.value||"resourcepack");
+  const zip=new JSZip()
+  const root=zip.folder(projectName.value||"resourcepack")
 
   root.file("pack.mcmeta",JSON.stringify({
-    pack:{pack_format:15,description:projectDesc.value||"Resource Pack"}
-  },null,2));
+    pack:{pack_format:15,description:projectDesc.value}
+  },null,2))
 
-  const tex=root.folder("assets/minecraft/textures/block");
+  const tex=root.folder("assets/minecraft/textures/block")
   for(const k in uploadedImages){
-    if(uploadedImages[k].file){
-      tex.file(k+".png",await uploadedImages[k].file.arrayBuffer());
-    }
+    tex.file(k+".png",await uploadedImages[k].file.arrayBuffer())
   }
 
-  const lang={};
+  const lang={}
   for(const k in displayNames){
-    lang["block.minecraft."+k]=displayNames[k];
+    lang["block.minecraft."+k]=displayNames[k]
   }
+
   root.folder("assets/minecraft/lang")
-    .file("pt_br.json",JSON.stringify(lang,null,2));
+    .file("pt_br.json",JSON.stringify(lang,null,2))
 
-  const blob=await zip.generateAsync({type:"blob"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="resourcepack.zip";
-  a.click();
+  const blob=await zip.generateAsync({type:"blob"})
+  const a=document.createElement("a")
+  a.href=URL.createObjectURL(blob)
+  a.download="resourcepack.zip"
+  a.click()
 }
-
-/* INIT */
-refreshProjects();
-refreshSelector();
 </script>
 </body>
 </html>
