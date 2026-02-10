@@ -1,293 +1,126 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gerador Minecraft Resource Pack</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
-<style>
-:root{
-  --bg:#f8f8f8;
-  --text:#222;
-  --card:#e0e0e0;
-  --item:#f0f0f0;
-}
-body{
-  font-family:Arial,sans-serif;
-  background:var(--bg);
-  color:var(--text);
-  max-width:1200px;
-  margin:auto;
-  padding:20px;
-}
-h1{text-align:center}
-.card{
-  background:var(--card);
-  padding:16px;
-  border-radius:10px;
-  margin-bottom:20px;
-}
-button{
-  cursor:pointer;
-  border:none;
-  padding:6px 10px;
-  border-radius:6px;
-}
-select,input,textarea{
-  width:100%;
-  margin:6px 0;
-  padding:6px;
-}
-#itemsContainer{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:12px;
-}
-.item{
-  background:var(--item);
-  border-radius:8px;
-  padding:10px;
-  text-align:center;
-}
-.preview{
-  width:100%;
-  aspect-ratio:1/1;
-  background:#ddd;
-  border-radius:6px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-weight:bold;
-  overflow:hidden;
-  text-align:center;
-  padding:4px;
-}
-.preview img{
-  max-width:100%;
-  max-height:100%;
-}
-.menu-config{
-  position:fixed;
-  top:20px;
-  left:0;
-  background:#ddd;
-  padding:12px;
-  border-radius:0 8px 8px 0;
-}
-.small{font-size:12px;opacity:.7}
-</style>
+  <meta charset="UTF-8" />
+  <title>Gerador Minecraft – Importar Texturas</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f2f2f2; padding:20px }
+    h1,h2 { margin-top:0 }
+    .box { background:#fff; padding:15px; border-radius:8px; margin-bottom:20px }
+    input, button { padding:8px; margin-top:6px; width:100% }
+    .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap:12px; margin-top:15px }
+    .item { border:1px solid #ccc; border-radius:6px; padding:8px; text-align:center; background:#fafafa; cursor:pointer }
+    .item img { width:64px; height:64px; image-rendering: pixelated }
+    .item input { width:100%; margin-top:4px }
+    .item.selected { outline:3px solid #4caf50 }
+  </style>
 </head>
-
 <body>
 
-<h1>Gerador Minecraft Resource Pack</h1>
+<h1>Gerador de Projeto Minecraft</h1>
 
-<div class="menu-config">
-  Fonte
-  <input type="number" value="16" onchange="document.body.style.fontSize=this.value+'px'">
+<div class="box">
+  <h2>Importar Texture Pack (pasta)</h2>
+  <input type="file" webkitdirectory multiple id="folderInput">
 </div>
 
-<div class="card">
-  <b>Modo Resource Pack</b><br>
-  <span class="small">Substitua terracotas e blocos</span>
+<div class="box">
+  <h2>Importar Texturas Avulsas (.png)</h2>
+  <input type="file" multiple accept=".png" id="fileInput">
+  <p style="font-size:13px">
+    Pode importar várias vezes. Texturas repetidas ou com mesmo nome são ignoradas.
+  </p>
 </div>
 
-<div class="card">
-  <label>Nome do projeto</label>
-  <input id="projectName">
-  <label>Descrição</label>
-  <textarea id="projectDesc"></textarea>
+<div class="box">
+  <h2>Itens / Blocos</h2>
+  <div id="items" class="grid"></div>
 </div>
 
-<div class="card">
-  <h3>Adicionar blocos</h3>
-  <select id="blockSelector"></select>
-  <button onclick="addVanillaBlock()">Adicionar bloco</button>
-
-  <hr>
-
-  <label><b>Importar Resource Pack (PASTA)</b></label>
-  <input type="file" webkitdirectory multiple onchange="importResourcePack(this.files)">
-
-  <hr>
-
-  <label><b>Importar textura (ARQUIVO PNG)</b></label>
-  <input type="file" accept="image/png" onchange="importSingleTexture(this)">
-  <span class="small">Pode importar várias vezes, um arquivo por vez</span>
+<div class="box">
+  <h2>Preview</h2>
+  <p id="previewName">Nenhum item selecionado</p>
 </div>
-
-<div class="card">
-  <h3>Blocos configurados</h3>
-  <div id="itemsContainer"></div>
-</div>
-
-<button onclick="exportPack()">Exportar</button>
 
 <script>
-const vanillaBlocks=[
-  "white_terracotta","orange_terracotta","magenta_terracotta",
-  "light_blue_terracotta","yellow_terracotta","lime_terracotta",
-  "pink_terracotta","gray_terracotta","light_gray_terracotta",
-  "cyan_terracotta","purple_terracotta","blue_terracotta",
-  "brown_terracotta","green_terracotta","red_terracotta",
-  "black_terracotta","terracotta","bricks","stone_bricks"
-];
+const itemsDiv = document.getElementById('items');
+const previewName = document.getElementById('previewName');
 
-let available=[...vanillaBlocks];
-let blocks={};
-let langData={};
+const items = {}; // chave = id do item
+let selectedId = null;
 
-function prettify(id){
-  return id.replace(/_/g," ").replace(/\b\w/g,l=>l.toUpperCase());
-}
+function createItem(id, file) {
+  if (items[id]) return; // não duplica
 
-function refreshSelector(){
-  const s=document.getElementById("blockSelector");
-  s.innerHTML="";
-  available.forEach(b=>{
-    const o=document.createElement("option");
-    o.value=b;o.textContent=b;
-    s.appendChild(o);
-  });
-}
+  const url = URL.createObjectURL(file);
 
-function addVanillaBlock(){
-  const id=document.getElementById("blockSelector").value;
-  blocks[id]={
+  items[id] = {
     id,
-    texture:null,
-    displayName:langData["block.minecraft."+id] || prettify(id)
+    displayName: id.replace(/_/g,' '),
+    file
   };
-  available=available.filter(b=>b!==id);
-  refreshSelector();
-  render();
-}
 
-async function readLang(files){
-  const langFile=[...files].find(f =>
-    f.webkitRelativePath.endsWith("/lang/pt_br.json") ||
-    f.webkitRelativePath.endsWith("/lang/en_us.json")
-  );
-  if(!langFile) return;
-  try{ langData=JSON.parse(await langFile.text()); }catch{}
-}
+  const div = document.createElement('div');
+  div.className = 'item';
+  div.dataset.id = id;
 
-async function importResourcePack(files){
-  await readLang(files);
+  const img = document.createElement('img');
+  img.src = url;
 
-  [...files].forEach(file=>{
-    const path=file.webkitRelativePath.replace(/\\/g,"/");
-    if(!path.includes("assets/minecraft/textures")) return;
-    if(!file.name.endsWith(".png")) return;
+  const label = document.createElement('div');
+  label.textContent = id;
 
-    const id=file.name.replace(".png","");
-    const reader=new FileReader();
-    reader.onload=()=>{
-      blocks[id]={
-        id,
-        texture:reader.result,
-        displayName:langData["block.minecraft."+id] || prettify(id)
-      };
-      available=available.filter(b=>b!==id);
-      refreshSelector();
-      render();
-    };
-    reader.readAsDataURL(file);
-  });
-}
+  const input = document.createElement('input');
+  input.value = items[id].displayName;
+  input.placeholder = 'Nome do item no jogo';
 
-function importSingleTexture(input){
-  const file=input.files[0];
-  if(!file) return;
-
-  const id=file.name.replace(".png","");
-  const reader=new FileReader();
-  reader.onload=()=>{
-    blocks[id]={
-      id,
-      texture:reader.result,
-      displayName:blocks[id]?.displayName || prettify(id)
-    };
-    available=available.filter(b=>b!==id);
-    refreshSelector();
-    render();
-  };
-  reader.readAsDataURL(file);
-
-  input.value=""; // permite importar o mesmo nome de novo se quiser
-}
-
-function render(){
-  const c=document.getElementById("itemsContainer");
-  c.innerHTML="";
-  Object.values(blocks).forEach(b=>{
-    const d=document.createElement("div");
-    d.className="item";
-    d.innerHTML=`
-      <div class="preview">
-        ${b.texture ? `<img src="${b.texture}">` : b.displayName}
-      </div>
-      <b>${b.id}</b><br>
-      <input value="${b.displayName}" placeholder="Nome no jogo"
-        oninput="blocks['${b.id}'].displayName=this.value">
-      <input type="file" accept="image/png" onchange="setTexture('${b.id}',this.files[0])">
-      ${b.texture?`<button onclick="downloadTexture('${b.id}')">Baixar textura</button>`:""}
-      <button onclick="removeBlock('${b.id}')">Remover</button>
-    `;
-    c.appendChild(d);
-  });
-}
-
-function setTexture(id,file){
-  const r=new FileReader();
-  r.onload=()=>{blocks[id].texture=r.result;render();}
-  r.readAsDataURL(file);
-}
-
-function downloadTexture(id){
-  const a=document.createElement("a");
-  a.href=blocks[id].texture;
-  a.download=id+".png";
-  a.click();
-}
-
-function removeBlock(id){
-  delete blocks[id];
-  if(vanillaBlocks.includes(id)) available.push(id);
-  refreshSelector();
-  render();
-}
-
-async function exportPack(){
-  const zip=new JSZip();
-  const rp=zip.folder("resourcepack");
-  rp.file("pack.mcmeta",JSON.stringify({
-    pack:{pack_format:15,description:document.getElementById("projectDesc").value||"Resource Pack"}
-  },null,2));
-
-  const tex=rp.folder("assets/minecraft/textures/block");
-  const lang=rp.folder("assets/minecraft/lang");
-  const langObj={};
-
-  for(const b of Object.values(blocks)){
-    if(b.texture){
-      const bin=await fetch(b.texture).then(r=>r.arrayBuffer());
-      tex.file(b.id+".png",bin);
+  input.addEventListener('input', () => {
+    items[id].displayName = input.value;
+    if (selectedId === id) {
+      previewName.textContent = input.value;
     }
-    langObj["block.minecraft."+b.id]=b.displayName;
+  });
+
+  div.addEventListener('click', () => {
+    document.querySelectorAll('.item').forEach(i => i.classList.remove('selected'));
+    div.classList.add('selected');
+    selectedId = id;
+    previewName.textContent = items[id].displayName;
+  });
+
+  div.appendChild(img);
+  div.appendChild(label);
+  div.appendChild(input);
+  itemsDiv.appendChild(div);
+}
+
+/* IMPORTAR PASTA */
+folderInput.addEventListener('change', (e) => {
+  const files = [...e.target.files];
+
+  const pngs = files.filter(f =>
+    f.name.endsWith('.png') &&
+    (f.webkitRelativePath.includes('/textures/block/') ||
+     f.webkitRelativePath.includes('/textures/item/'))
+  );
+
+  for (const file of pngs) {
+    const id = file.name.replace('.png','');
+    createItem(id, file);
+  }
+});
+
+/* IMPORTAR ARQUIVOS AVULSOS (MÚLTIPLOS / VÁRIAS VEZES) */
+fileInput.addEventListener('change', (e) => {
+  const files = [...e.target.files];
+
+  for (const file of files) {
+    const id = file.name.replace('.png','');
+    createItem(id, file);
   }
 
-  lang.file("pt_br.json",JSON.stringify(langObj,null,2));
-
-  const blob=await zip.generateAsync({type:"blob"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="resourcepack.zip";
-  a.click();
-}
-
-refreshSelector();
+  fileInput.value = ''; // permite importar de novo os mesmos arquivos depois
+});
 </script>
 
 </body>
