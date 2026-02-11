@@ -2,78 +2,80 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gerador Minecraft Resource Pack</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <style>
-:root{
-  --bg:#f8f8f8;
-  --text:#222;
-  --card:#e0e0e0;
-  --item:#f0f0f0;
-}
 body{
   font-family:Arial,sans-serif;
-  background:var(--bg);
-  color:var(--text);
-  max-width:1200px;
+  background:#f2f2f2;
+  max-width:1300px;
   margin:auto;
   padding:20px;
 }
 h1{text-align:center}
+
 .card{
-  background:var(--card);
+  background:#e0e0e0;
   padding:16px;
   border-radius:10px;
   margin-bottom:20px;
 }
-button{
-  cursor:pointer;
-  border:none;
-  padding:6px 10px;
-  border-radius:6px;
-}
-select,input,textarea{
+
+input,textarea,select,button{
   width:100%;
-  margin:6px 0;
   padding:6px;
+  margin:6px 0;
 }
-#itemsContainer{
+
+#itemsContainer,#importedContainer{
   display:grid;
-  grid-template-columns:repeat(3,1fr);
+  grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
   gap:12px;
 }
+
 .item{
-  background:var(--item);
+  background:#fafafa;
   border-radius:8px;
   padding:10px;
   text-align:center;
 }
+
 .preview{
-  width:100%;
-  aspect-ratio:1/1;
+  width:96px;
+  height:96px;
   background:#ddd;
-  border-radius:6px;
+  border-radius:8px;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-weight:bold;
+  margin:auto;
   overflow:hidden;
+  font-weight:bold;
 }
+
 .preview img{
-  max-width:100%;
-  max-height:100%;
+  width:64px;
+  height:64px;
+  image-rendering:pixelated;
 }
-.menu-config{
-  position:fixed;
-  top:20px;
-  left:0;
-  background:#ddd;
-  padding:12px;
-  border-radius:0 8px 8px 0;
+
+#gamePreview{
+  background:#111;
+  color:white;
+  padding:16px;
+  border-radius:10px;
 }
-.small{font-size:12px;opacity:.7}
+
+.game-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background:#222;
+  padding:8px;
+  border-radius:6px;
+  margin-bottom:6px;
+}
 </style>
 </head>
 
@@ -81,125 +83,133 @@ select,input,textarea{
 
 <h1>Gerador Minecraft Resource Pack</h1>
 
-<div class="menu-config">
-  Fonte
-  <input type="number" value="16" onchange="document.body.style.fontSize=this.value+'px'">
-</div>
-
-<div class="card">
-  <b>Modo Resource Pack</b><br>
-  <span class="small">Substitua terracotas e blocos</span>
-</div>
-
 <div class="card">
   <label>Nome do projeto</label>
-  <input id="projectName">
+  <input id="projectName" placeholder="Meu Resource Pack">
   <label>Descrição</label>
   <textarea id="projectDesc"></textarea>
 </div>
 
 <div class="card">
-  <h3>Adicionar blocos</h3>
-  <select id="blockSelector"></select>
-  <button onclick="addVanillaBlock()">Adicionar bloco</button>
-
-  <hr>
-
-  <label><b>Importar Resource Pack (PASTA)</b></label>
-  <input type="file" webkitdirectory multiple onchange="importResourcePack(this.files)">
-
-  <hr>
-
-  <label><b>Importar múltiplas texturas (PNG)</b></label>
-  <input type="file" accept="image/png" multiple onchange="importMultiplePNGs(this.files)">
-  <span class="small">Cada PNG será associado automaticamente a um bloco disponível</span>
+  <h3>Ícone do Resource Pack (pack.png)</h3>
+  <input type="file" accept="image/png" onchange="setPackIcon(this.files[0])">
+  <div class="preview" id="packPreview">Sem imagem</div>
 </div>
 
 <div class="card">
-  <h3>Blocos configurados</h3>
+  <h3>Criar itens manualmente</h3>
+  <select id="blockSelector"></select>
+  <button onclick="addManualBlock()">Adicionar bloco</button>
+</div>
+
+<div class="card">
+  <h3>Importar imagens PNG (múltiplas)</h3>
+  <input type="file" accept="image/png" multiple onchange="importPNGs(this.files)">
+</div>
+
+<div class="card">
+  <h3>Importar Resource Pack INTEIRO (PASTA)</h3>
+  <input type="file" webkitdirectory multiple onchange="importResourcePack(this.files)">
+</div>
+
+<div class="card">
+  <h3>Itens / Blocos configurados</h3>
   <div id="itemsContainer"></div>
 </div>
 
-<button onclick="exportPack()">Exportar</button>
+<div class="card">
+  <button onclick="generatePreview()">Salvar Resource Pack (Preview)</button>
+</div>
+
+<div class="card">
+  <h3>Preview no jogo</h3>
+  <div id="gamePreview">Nenhum preview gerado</div>
+</div>
+
+<button onclick="exportPack()">Exportar Resource Pack</button>
 
 <script>
 const vanillaBlocks=[
-  "white_terracotta","orange_terracotta","magenta_terracotta",
-  "light_blue_terracotta","yellow_terracotta","lime_terracotta",
-  "pink_terracotta","gray_terracotta","light_gray_terracotta",
-  "cyan_terracotta","purple_terracotta","blue_terracotta",
-  "brown_terracotta","green_terracotta","red_terracotta",
-  "black_terracotta","terracotta","bricks","stone_bricks"
+ "white_terracotta","orange_terracotta","magenta_terracotta",
+ "light_blue_terracotta","yellow_terracotta","lime_terracotta",
+ "pink_terracotta","gray_terracotta","light_gray_terracotta",
+ "cyan_terracotta","purple_terracotta","blue_terracotta",
+ "brown_terracotta","green_terracotta","red_terracotta",
+ "black_terracotta"
 ];
 
 let available=[...vanillaBlocks];
 let blocks={};
+let packIcon=null;
+
+const selector=document.getElementById("blockSelector");
 
 function refreshSelector(){
-  const s=document.getElementById("blockSelector");
-  s.innerHTML="";
+  selector.innerHTML="";
   available.forEach(b=>{
     const o=document.createElement("option");
-    o.value=b;
-    o.textContent=b;
-    s.appendChild(o);
+    o.value=b;o.textContent=b;
+    selector.appendChild(o);
+  });
+}
+refreshSelector();
+
+function resizeImage(file,size,cb){
+  const img=new Image();
+  const r=new FileReader();
+  r.onload=()=>img.src=r.result;
+  img.onload=()=>{
+    const c=document.createElement("canvas");
+    c.width=size;c.height=size;
+    const ctx=c.getContext("2d");
+    ctx.imageSmoothingEnabled=false;
+    ctx.drawImage(img,0,0,size,size);
+    cb(c.toDataURL("image/png"));
+  };
+  r.readAsDataURL(file);
+}
+
+function setPackIcon(file){
+  resizeImage(file,64,(data)=>{
+    packIcon=data;
+    packPreview.innerHTML=`<img src="${data}">`;
   });
 }
 
-function addVanillaBlock(){
-  const name=document.getElementById("blockSelector").value;
-  if(!name) return;
-  blocks[name]={name,texture:null,displayName:name.replace(/_/g," ")};
-  available=available.filter(b=>b!==name);
+function addManualBlock(){
+  if(!available.length) return;
+  const id=selector.value;
+  blocks[id]={id,name:id,texture:null};
+  available=available.filter(b=>b!==id);
   refreshSelector();
   render();
 }
 
-function importResourcePack(files){
+function importPNGs(files){
   [...files].forEach(file=>{
-    const path=file.webkitRelativePath.replace(/\\/g,"/");
-    if(!path.includes("assets/minecraft/textures")) return;
-    if(!file.name.endsWith(".png")) return;
-
-    if(available.length===0) return;
-
-    const blockName=available.shift();
-    const displayName=file.name.replace(".png","").replace(/_/g," ");
-
-    const reader=new FileReader();
-    reader.onload=()=>{
-      blocks[blockName]={
-        name:blockName,
-        texture:reader.result,
-        displayName
-      };
-      refreshSelector();
+    if(!available.length) return;
+    const id=available.shift();
+    resizeImage(file,16,(data)=>{
+      blocks[id]={id,name:file.name.replace(".png",""),texture:data};
       render();
-    };
-    reader.readAsDataURL(file);
+    });
   });
+  refreshSelector();
 }
 
-function importMultiplePNGs(files){
+function importResourcePack(files){
   [...files].forEach(file=>{
     if(!file.name.endsWith(".png")) return;
-    if(available.length===0) return;
+    if(!file.webkitRelativePath.includes("textures")) return;
+    if(!available.length) return;
 
-    const blockName=available.shift();
-    const displayName=file.name.replace(".png","").replace(/_/g," ");
-
-    const reader=new FileReader();
-    reader.onload=()=>{
-      blocks[blockName]={
-        name:blockName,
-        texture:reader.result,
-        displayName
-      };
-      refreshSelector();
+    const id=available.shift();
+    resizeImage(file,16,(data)=>{
+      blocks[id]={id,name:file.name.replace(".png",""),texture:data};
       render();
-    };
-    reader.readAsDataURL(file);
+    });
   });
+  refreshSelector();
 }
 
 function render(){
@@ -210,60 +220,68 @@ function render(){
     d.className="item";
     d.innerHTML=`
       <div class="preview">
-        ${b.texture ? `<img src="${b.texture}">` : b.displayName}
+        ${b.texture?`<img src="${b.texture}">`:b.name}
       </div>
-      <b>${b.displayName}</b>
-      <input placeholder="Nome no jogo" value="${b.displayName}"
-        oninput="blocks['${b.name}'].displayName=this.value">
-      <input type="file" accept="image/png" onchange="setTexture('${b.name}',this.files[0])">
-      ${b.texture?`<button onclick="downloadTexture('${b.name}')">Baixar textura</button>`:""}
-      <button onclick="removeBlock('${b.name}')">Remover</button>
+      <input value="${b.name}" 
+        placeholder="Nome no jogo"
+        onchange="blocks['${b.id}'].name=this.value">
+      <small>${b.id}</small>
     `;
     c.appendChild(d);
   });
 }
 
-function setTexture(name,file){
-  const r=new FileReader();
-  r.onload=()=>{
-    blocks[name].texture=r.result;
-    render();
-  };
-  r.readAsDataURL(file);
-}
-
-function downloadTexture(name){
-  const a=document.createElement("a");
-  a.href=blocks[name].texture;
-  a.download=name+".png";
-  a.click();
-}
-
-function removeBlock(name){
-  delete blocks[name];
-  if(vanillaBlocks.includes(name)) available.push(name);
-  refreshSelector();
-  render();
+function generatePreview(){
+  const gp=document.getElementById("gamePreview");
+  gp.innerHTML="";
+  Object.values(blocks).forEach(b=>{
+    const div=document.createElement("div");
+    div.className="game-item";
+    div.innerHTML=`
+      <img src="${b.texture||''}" width="32" height="32">
+      <span>${b.name}</span>
+    `;
+    gp.appendChild(div);
+  });
 }
 
 async function exportPack(){
   const zip=new JSZip();
-  const rp=zip.folder("resourcepack");
 
-  rp.file("pack.mcmeta",JSON.stringify({
-    pack:{pack_format:15,description:document.getElementById("projectDesc").value||"Resource Pack"}
+  function textIcon(){
+    const c=document.createElement("canvas");
+    c.width=64;c.height=64;
+    const ctx=c.getContext("2d");
+    ctx.fillStyle="#fff";
+    ctx.fillRect(0,0,64,64);
+    ctx.fillStyle="#000";
+    ctx.font="bold 14px Arial";
+    ctx.textAlign="center";
+    ctx.textBaseline="middle";
+    ctx.fillText(
+      (projectName.value||"PACK").slice(0,8),
+      32,32
+    );
+    return c.toDataURL();
+  }
+
+  const icon=packIcon||textIcon();
+  zip.file("pack.png",await fetch(icon).then(r=>r.arrayBuffer()));
+
+  zip.file("pack.mcmeta",JSON.stringify({
+    pack:{pack_format:15,description:projectDesc.value}
   },null,2));
 
-  const tex=rp.folder("assets/minecraft/textures/block");
-  const lang=rp.folder("assets/minecraft/lang");
+  const tex=zip.folder("assets/minecraft/textures/block");
+  const lang=zip.folder("assets/minecraft/lang");
   const langObj={};
 
   for(const b of Object.values(blocks)){
     if(b.texture){
       const bin=await fetch(b.texture).then(r=>r.arrayBuffer());
-      tex.file(b.name+".png",bin);
+      tex.file(b.id+".png",bin);
     }
-    langObj["block.minecraft."+b.name]=b.displayName;
+    langObj["block.minecraft."+b.id]=b.name;
   }
 
   lang.file("pt_br.json",JSON.stringify(langObj,null,2));
@@ -274,8 +292,6 @@ async function exportPack(){
   a.download="resourcepack.zip";
   a.click();
 }
-
-refreshSelector();
 </script>
 
 </body>
